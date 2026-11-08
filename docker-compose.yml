@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dream
+      POSTGRES_PASSWORD: dream
+      POSTGRES_DB: dream
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: ./backend
+    env_file: ./.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://dream:dream@db:5432/dream
+      STORAGE_ROOT: /app/storage
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      - db
+    profiles: ["full"]   # 기본은 db만 실행, 전체 실행은: docker compose --profile full up
+
+volumes:
+  pgdata:
