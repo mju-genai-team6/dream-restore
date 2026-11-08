@@ -1,0 +1,79 @@
+# ==============================================
+# dream-restore 공통 .gitignore
+# ==============================================
+
+# ---------- 비밀 정보 (절대 커밋 금지) ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ---------- 에디터 / AI 도구 ----------
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Python (backend) ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+
+# ---------- Node / Next.js (frontend) ----------
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- 생성 결과물 (README 협업 규칙) ----------
+# 업로드 음성, 생성 이미지, 렌더링 영상, TTS 음성은 커밋하지 않음
+storage/*
+!storage/.gitkeep
+outputs/
+tmp/
+
+# ---------- 데이터 / 실험 ----------
+# 실제 꿈 기록(개인 정보)은 올리지 않음
+data/raw/
+data/private/
+experiments/**/outputs/
+experiments/**/*.png
+experiments/**/*.jpg
+experiments/**/*.mp4
+experiments/**/*.mp3
+.ipynb_checkpoints/
+
+# ---------- Docker / DB ----------
+pgdata/
+*.sqlite3
+*.db
