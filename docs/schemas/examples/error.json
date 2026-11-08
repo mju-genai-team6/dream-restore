@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "INVALID_STATE",
+    "message": "인터뷰가 끝나야 장면을 만들 수 있습니다.",
+    "detail": { "status": "interviewing" }
+  }
+}

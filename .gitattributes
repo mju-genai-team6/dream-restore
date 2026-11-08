@@ -1,0 +1,8 @@
+# Windows/Mac 팀원 간 줄바꿈 통일
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.mp3 binary
+*.webm binary
+*.docx binary

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings
+sqlalchemy>=2
+psycopg[binary]
+alembic
+python-multipart
+sse-starlette
+httpx
+Pillow

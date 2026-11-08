@@ -1,0 +1,13 @@
+# 각 줄의 @아이디를 팀원 GitHub 아이디로 바꿔 주세요.
+# 해당 폴더가 바뀌는 PR에 담당자가 리뷰어로 자동 지정됩니다.
+/frontend/                                @이연주-github @인진은-github
+/backend/                                 @Park-Yena00
+/backend/app/llm/                         @정은수-github
+/backend/worker/image_gen/                @김민진-github
+/backend/worker/postprocess/              @이종민-github
+/backend/worker/render/                   @이종민-github @김민진-github
+/backend/app/core/enums.py                @Park-Yena00 @정은수-github @이종민-github @김민진-github
+/docs/rules/                              @Park-Yena00 @정은수-github @이종민-github @김민진-github @이연주-github @인진은-github
+/docs/schemas/                            @Park-Yena00 @정은수-github @이연주-github @인진은-github
+/experiments/confidence_blur/             @이종민-github
+/experiments/character_consistency/       @김민진-github
