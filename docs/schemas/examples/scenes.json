@@ -1,0 +1,22 @@
+{
+  "scenes": [
+    {
+      "order": 1,
+      "summary_ko": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
+      "element_names": ["학교 복도", "두려움"],
+      "image_prompt_en": "A long dark school hallway with flickering fluorescent lights, empty and quiet, eerie dreamlike atmosphere, cinematic wide shot"
+    },
+    {
+      "order": 2,
+      "summary_ko": "분홍색 카디건을 입은 할머니가 나타나 노란 우산을 건넨다.",
+      "element_names": ["학교 복도", "할머니", "우산", "안도감"],
+      "image_prompt_en": "An elderly Korean woman with white hair wearing a pink cardigan, handing over a yellow long umbrella in a dim school hallway, warm soft light, dreamlike"
+    },
+    {
+      "order": 3,
+      "summary_ko": "창밖을 보니 학교 밖이 높은 파도가 치는 회색 바다다.",
+      "element_names": ["바다", "우산", "두려움"],
+      "image_prompt_en": "View through a school window of a gray stormy sea with high waves, holding a yellow umbrella, ominous surreal dream atmosphere"
+    }
+  ]
+}

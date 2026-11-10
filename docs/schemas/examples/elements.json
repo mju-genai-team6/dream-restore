@@ -1,0 +1,10 @@
+{
+  "elements": [
+    { "type": "place", "name": "학교 복도", "description": "어둡고 긴 복도, 형광등이 깜빡임" },
+    { "type": "person", "name": "할머니", "description": "흰 머리에 분홍색 카디건을 입음" },
+    { "type": "object", "name": "우산", "description": "노란색 장우산" },
+    { "type": "place", "name": "바다", "description": "창밖으로 보인 회색 바다, 파도가 높음" },
+    { "type": "emotion", "name": "두려움", "description": "바다를 보고 무서웠음" },
+    { "type": "emotion", "name": "안도감", "description": "우산을 받고 마음이 놓임" }
+  ]
+}
