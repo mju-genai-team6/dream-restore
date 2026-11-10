@@ -1,0 +1,17 @@
+{
+  "elements": [
+    { "type": "place", "name": "학교 복도", "description": "어둡고 긴 복도" },
+    { "type": "person", "name": "할머니", "description": "" },
+    { "type": "object", "name": "우산", "description": "할머니가 건네준 우산" },
+    { "type": "place", "name": "바다", "description": "창밖으로 보인 바다" },
+    { "type": "emotion", "name": "두려움", "description": "바다를 보고 무서웠음" }
+  ],
+  "questions": [
+    { "order": 1, "target_element": "학교 복도", "question": "복도에서 기억나는 것을 자유롭게 말해 주세요." },
+    { "order": 2, "target_element": "할머니", "question": "할머니는 어떤 모습이었나요?" },
+    { "order": 3, "target_element": "할머니", "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요." },
+    { "order": 4, "target_element": "우산", "question": "우산은 어떻게 생겼나요?" },
+    { "order": 5, "target_element": "바다", "question": "바다를 봤을 때 주변은 어땠나요?" },
+    { "order": 6, "target_element": null, "question": "꿈이 어떻게 끝났는지 기억나나요?" }
+  ]
+}
