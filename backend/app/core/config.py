@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     image_api_key: str = ""
     tts_api_key: str = ""
 
+    # app/llm (D): 모델 이름은 .env에서 바꿀 수 있음
+    llm_model: str = "gpt-4o-mini"
+    stt_model: str = "whisper-1"
+    llm_timeout_seconds: int = 60
+
     image_max_concurrency: int = 3
     job_timeout_seconds: int = 300
     audio_max_mb: int = 25
