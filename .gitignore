@@ -67,6 +67,7 @@ tmp/
 data/raw/
 data/private/
 experiments/**/outputs/
+experiments/test_output/
 experiments/**/*.png
 experiments/**/*.jpg
 experiments/**/*.mp4
