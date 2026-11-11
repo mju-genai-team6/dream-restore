@@ -32,6 +32,7 @@ from app.core.enums import FailureCode, JobStage, JobType
 from app.jobs.context import JobContext, JobError
 from app.jobs.registry import register
 from app.storage import paths
+from worker.image_gen.config import image_settings as img_cfg
 from worker.image_gen.prompt import Character, build_prompt
 
 # OpenAI가 콘텐츠 정책 위반으로 거절할 때 주는 오류 코드
@@ -42,7 +43,7 @@ sleep: Callable[[float], None] = time.sleep
 
 
 def image_settings() -> dict[str, Any]:
-    return {"size": settings.image_size, "quality": settings.image_quality}
+    return {"size": img_cfg.image_size, "quality": img_cfg.image_quality}
 
 
 def get_client() -> openai.OpenAI:
@@ -84,7 +85,7 @@ def _parse_payload(payload: dict) -> tuple[int, int, str]:
 def _request_image(client: openai.OpenAI, prompt: str) -> bytes:
     """API를 한 번 호출하고 PNG 바이트를 돌려준다. 오류는 팀 공통 실패 사유로 바꾼다."""
     try:
-        result = client.images.generate(model=settings.openai_image_model, prompt=prompt, n=1, **image_settings())
+        result = client.images.generate(model=img_cfg.openai_image_model, prompt=prompt, n=1, **image_settings())
     except openai.APITimeoutError as e:
         raise JobError(FailureCode.TIMEOUT, "이미지 생성 시간이 초과되었습니다.", retryable=True) from e
     except openai.BadRequestError as e:
@@ -113,9 +114,9 @@ def _verify_png(image_bytes: bytes) -> None:
 
 
 def _generate_with_retry(ctx: JobContext, client: openai.OpenAI, prompt: str) -> tuple[bytes, int]:
-    """시간 초과·일시적 오류는 settings.image_max_retries번까지 다시 시도한다.
+    """시간 초과·일시적 오류는 img_cfg.image_max_retries번까지 다시 시도한다.
     정책 거부·잘못된 요청은 다시 해도 같으므로 바로 실패 처리한다."""
-    max_attempts = 1 + max(settings.image_max_retries, 0)
+    max_attempts = 1 + max(img_cfg.image_max_retries, 0)
     for attempt in range(1, max_attempts + 1):
         try:
             return _request_image(client, prompt), attempt
@@ -146,7 +147,7 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
     )
 
     ctx.report_stage(JobStage.REQUESTING)
-    ctx.logger.info("이미지 생성 요청 scene=%s v%s model=%s", scene_id, version_no, settings.openai_image_model)
+    ctx.logger.info("이미지 생성 요청 scene=%s v%s model=%s", scene_id, version_no, img_cfg.openai_image_model)
     started = time.monotonic()
     image_bytes, attempts = _generate_with_retry(ctx, get_client(), final_prompt)
     elapsed = round(time.monotonic() - started, 2)
@@ -161,7 +162,7 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
     return {
         "image_path": str(paths.scene_original(ctx.dream_id, scene_id, version_no)),
         "final_prompt": final_prompt,
-        "model": settings.openai_image_model,
+        "model": img_cfg.openai_image_model,
         "settings": image_settings(),
         "seed": None,  # OpenAI 이미지 API는 seed를 지원하지 않음
         "attempts": attempts,

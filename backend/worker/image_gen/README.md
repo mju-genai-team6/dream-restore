@@ -14,6 +14,7 @@
 | --- | --- |
 | `generate.py` | `handle_generate_image` (`@register(JobType.GENERATE_IMAGE)`), 장면 1개 = 작업 1개 |
 | `prompt.py` | 프롬프트 조합: 공통 화풍 → 장면 내용 → 인물 외형 → 확신도 스타일 |
+| `config.py` | 이미지 생성 설정 (공용 `app/core/config.py`와 같은 `.env`를 읽음) |
 
 ### payload (C가 Job API에서 넣어 줄 값)
 
@@ -42,4 +43,4 @@
   콘텐츠 정책 거부·잘못된 요청은 바로 실패. **작업 실행기(C)에서는 추가 재시도하지 않아도 됩니다.**
 - 설정은 `.env`의 `OPENAI_IMAGE_MODEL`, `IMAGE_SIZE`, `IMAGE_QUALITY`, `IMAGE_MAX_RETRIES`로 바꿀 수 있습니다.
 
-테스트: `pytest tests/test_image_gen.py` (실제 API를 부르지 않음)
+테스트: `tests/test_image_gen.py`는 `backend/tests/` 담당자와 협의 후 추가 예정 (실제 API를 부르지 않음)
