@@ -7,7 +7,7 @@ LLM이 돌려준 JSON이 이 모양과 맞는지 Pydantic으로 검사합니다.
 - 확신도(confidence)는 LLM이 아니라 사용자가 입력하므로 여기에는 없습니다.
   요소와 확신도는 C의 DB(dream_element)에서 합쳐집니다.
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.enums import ElementType
 
@@ -48,6 +48,22 @@ class ExtractionResult(BaseModel):
     @classmethod
     def _questions_in_order(cls, v: list[InterviewQuestion]) -> list[InterviewQuestion]:
         return _check_order(v, "질문")
+
+    @model_validator(mode="after")
+    def _targets_exist(self) -> "ExtractionResult":
+        """질문 대상(target_element)은 추출된 요소 이름 중 하나여야 합니다."""
+        names = {e.name for e in self.elements}
+        unknown = [q.target_element for q in self.questions if q.target_element and q.target_element not in names]
+        if unknown:
+            raise ValueError(f"target_element가 elements의 name에 없습니다: {unknown}")
+        return self
+
+
+class InterviewAnswer(BaseModel):
+    """reextract에 넘기는 질문-답변 한 쌍. 답이 비어 있으면 '기억나지 않음'으로 처리합니다."""
+
+    question: str
+    answer: str | None = None
 
 
 class ReextractionResult(BaseModel):
