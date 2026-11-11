@@ -9,3 +9,4 @@ python-multipart
 sse-starlette
 httpx
 Pillow
+openai
