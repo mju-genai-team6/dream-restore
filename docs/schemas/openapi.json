@@ -523,6 +523,40 @@
               }
             }
           },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -648,7 +682,7 @@
         "tags": [
           "elements"
         ],
-        "summary": "요소 목록 (인터뷰 반영)",
+        "summary": "요소 목록 (인터뷰 완료 후 첫 호출 시 재추출)",
         "operationId": "list_elements_dreams__dream_id__elements_get",
         "parameters": [
           {
@@ -710,6 +744,40 @@
               }
             }
           },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -728,7 +796,7 @@
         "tags": [
           "elements"
         ],
-        "summary": "요소별 확신도 저장",
+        "summary": "요소별 확신도 저장 (일부만 보내도 됨)",
         "operationId": "set_confidences_dreams__dream_id__elements_confidence_put",
         "parameters": [
           {

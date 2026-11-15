@@ -6,6 +6,7 @@ from app.services.dreams import ensure_sample_dream
 
 
 # TODO(C-S2-04): 상태 검사 후 create_job_or_get_active, 실행기에 등록
+# TODO(C-S2-04): generate_scenes는 최신 추출 요소 중 확신도가 빈(NULL) 요소가 있으면 409 INVALID_STATE
 def create_job(dream_id: int, _: JobCreate) -> JobCreateResponse:
     ensure_sample_dream(dream_id)
     return JobCreateResponse.model_validate(mock_data.JOB_CREATED)

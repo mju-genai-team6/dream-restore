@@ -2,12 +2,14 @@
 from datetime import UTC, datetime
 
 from app.models.dream import AudioFile, Dream
-from app.models.interview import InterviewQuestion
+from app.models.interview import DreamElement, Extraction, InterviewQuestion
 from app.models.scene import Render
 
 dreams: dict[int, Dream] = {}
 audio_files: dict[int, AudioFile] = {}
 questions: dict[int, InterviewQuestion] = {}
+extractions: dict[int, Extraction] = {}
+elements: dict[int, DreamElement] = {}
 renders: dict[int, Render] = {}
 _seq: dict[str, int] = {}
 
@@ -26,5 +28,7 @@ def clear() -> None:
     dreams.clear()
     audio_files.clear()
     questions.clear()
+    extractions.clear()
+    elements.clear()
     renders.clear()
     _seq.clear()
