@@ -12,13 +12,6 @@ client = TestClient(app)
 
 JSON_CASES = [
     ("get", "/dreams", {}, 200, mock_data.DREAM_LIST),
-    (
-        "post",
-        "/dreams/1/audio",
-        {"files": {"file": ("dream.webm", b"fake", "audio/webm")}},
-        201,
-        mock_data.AUDIO_UPLOADED,
-    ),
     ("post", "/dreams/1/jobs", {"json": mock_data.JOB_CREATE}, 202, mock_data.JOB_CREATED),
     ("get", "/jobs/1", {}, 200, mock_data.JOB),
     ("get", "/dreams/1/scenes", {}, 200, mock_data.SCENES),

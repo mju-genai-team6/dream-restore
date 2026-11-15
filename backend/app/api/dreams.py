@@ -82,6 +82,10 @@ def confirm_text(
     dependencies=[Depends(mark_mock)],
 )
 def upload_audio(
-    dream_id: int, file: Annotated[UploadFile, File(description="녹음 파일")]
+    dream_id: int,
+    file: Annotated[UploadFile, File(description="녹음 파일")],
+    db: Annotated[Session, Depends(get_db)],
 ) -> AudioUploadResponse:
-    return dream_service.upload_audio(dream_id)
+    return dream_service.upload_audio(
+        db, dream_id, filename=file.filename, content_type=file.content_type, fileobj=file.file
+    )
