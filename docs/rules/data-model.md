@@ -1,0 +1,174 @@
+# 데이터 모델
+
+담당: C2 · 코드 원본: `backend/app/models/` · 마이그레이션: `backend/alembic/versions/`
+
+C 계획서 3.3과 DB 이관 문서 2장을 기준으로 한 12개 테이블입니다. 두 문서에 없는 컬럼은 넣지 않았습니다(`id`, `created_at`, `updated_at` 공통 규칙 제외). 컬럼이 필요하면 단톡방이나 이슈로 C2에게 요청해 주세요. 마이그레이션 파일은 C2만 만듭니다.
+
+## ERD
+
+```mermaid
+erDiagram
+    dreams ||--o{ audio_files : ""
+    dreams ||--o{ extractions : ""
+    dreams ||--o{ dream_elements : ""
+    extractions ||--o{ dream_elements : ""
+    world_entities |o--o{ dream_elements : "entity_id"
+    dreams ||--o{ interview_questions : ""
+    dreams ||--o{ scenes : ""
+    scenes ||--o{ scene_versions : ""
+    scenes |o--o| scene_versions : "current_version_id"
+    scene_versions ||--o| narrations : ""
+    dreams ||--o{ renders : ""
+    dreams ||--o{ jobs : ""
+    dreams ||--o{ evaluations : ""
+    renders |o--o{ evaluations : ""
+```
+
+`renders.scene_version_ids`(배열)와 `scene_versions.element_ids`(배열), `jobs.target_id`는 외래키 없이 id만 저장합니다.
+
+## 공통 규칙
+
+- 기본키 `id`는 자동 증가 bigint입니다. 파일 경로(`storage/paths.py`)가 이 id를 씁니다.
+- 모든 테이블에 `created_at`, 값이 바뀌는 테이블에는 `updated_at`이 있습니다(`app/db/base.py`).
+- 상태·종류 값은 문자열 + CHECK 제약입니다. 값 목록은 `app/core/enums.py`에서 가져오고, `tests/repositories/test_models.py`가 DB 제약과 enums.py가 같은지 검사합니다.
+- 꿈 기록(`dreams`)을 지우면 딸린 데이터가 모두 함께 지워집니다(ON DELETE CASCADE).
+- 파일은 `storage/`에 저장하고, DB에는 `storage/` 기준 상대 경로 문자열만 둡니다.
+- `order`는 SQL 예약어라 직접 SQL을 쓸 때는 `"order"`처럼 따옴표로 감싸야 합니다.
+
+## 테이블
+
+### dreams — 꿈 기록
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| input_type | text | `voice`, `text` |
+| status | text | `recorded`(기본) → `interviewing` → `scenes_ready` → `images_ready` → `rendered`, 앞으로만 이동 |
+| raw_text | text, NULL | 입력 원문 또는 STT 결과 |
+| confirmed_text | text, NULL | 사용자가 확정한 원문 |
+
+인덱스: `created_at DESC` (꿈 일기 목록)
+
+### audio_files — 음성 파일
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| path | text | `dreams/{dreamId}/audio/{audioId}.webm` |
+| mime_type | text | `audio/webm`, `audio/mp4`, `audio/x-m4a` |
+| size | bigint | 바이트 |
+| duration | float, NULL | 초 |
+
+### extractions — 요소 추출 결과 (D 지표)
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| phase | text | `raw`(원문 추출), `after_interview`(인터뷰 반영 재추출) |
+| payload | jsonb | LLM 출력 원본 (`app/llm/schemas.py`) |
+| element_count | int | 추출된 요소 수 |
+| text_length | int | 추출에 쓴 텍스트 글자 수 |
+
+### dream_elements — 요소
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| extraction_id | FK extractions | 어느 추출에서 나왔는지 |
+| type | text | `person`, `place`, `object`, `emotion` |
+| name | text | 짧은 이름 (예: 할머니) |
+| description | text | 꿈 속 묘사, 없으면 빈 문자열 |
+| confidence | text, NULL | `high`, `medium`, `low`. **사용자 입력만 저장**, 입력 전에는 NULL |
+| entity_id | FK world_entities, NULL | (선택) 세계관 인물·장소 연결 |
+
+### interview_questions — 되묻기 질문
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| order | int | 1부터, 꿈마다 중복 불가 |
+| text | text | 질문 |
+| target_element | text, NULL | 질문 대상 요소 name, 꿈 전체 질문이면 NULL |
+| answer | text, NULL | 답변 |
+| skipped | bool | "기억 안 남" |
+
+진행 위치(answered/total)는 `answer IS NOT NULL OR skipped`인 질문 수로 계산합니다.
+
+### scenes — 장면
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| order | int | 1부터, 꿈마다 중복 불가 |
+| current_version_id | FK scene_versions, NULL | 지금 보여 줄 버전 |
+
+### scene_versions — 장면 버전 (덮어쓰지 않고 새 행 추가)
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| scene_id | FK scenes | |
+| version_no | int | 1부터, 장면마다 중복 불가 |
+| summary_ko | text | 스토리보드 표시용 한국어 요약 (D) |
+| prompt_en | text | 장면 프롬프트 (D) |
+| element_ids | bigint[] | 이 장면에 나오는 dream_elements.id |
+| confidence_level | text, NULL | E1 규칙으로 계산한 장면 확신도 `high`/`medium`/`low` |
+| status | text | 이미지 생성 상태 `queued`(기본), `running`, `succeeded`, `failed` |
+| final_prompt | text, NULL | 인물 외형·화풍을 붙여 실제로 보낸 프롬프트 (E2) |
+| model | text, NULL | 이미지 생성 모델 (E2) |
+| settings | jsonb | 생성 설정 (E2) |
+| seed | bigint, NULL | (E2) |
+| image_path | text, NULL | `dreams/{dreamId}/scenes/{sceneId}/v{versionNo}/original.png` |
+
+### renders — 영상
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| status | text | `queued`(기본), `running`, `succeeded`, `failed` |
+| video_path | text, NULL | `dreams/{dreamId}/renders/{renderId}/video.mp4` |
+| width, height, duration | NULL | 결과 검증 값 (E1) |
+| scene_version_ids | bigint[] | 렌더 시작 시 고정한 장면 버전 (장면 순서대로). 이후 바꾸지 않음 |
+| postprocess_settings | jsonb | 블러 등 후처리 설정 (E1) |
+
+`is_latest`는 저장하지 않고, `scene_version_ids`와 각 장면의 `current_version_id`를 비교해 계산합니다.
+
+### jobs — 작업
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| type | text | `generate_scenes`, `generate_image`, `render_video`, `generate_narration`, `revise_scene` |
+| target_id | bigint, NULL | generate_image: scene_versions.id / render_video: renders.id / generate_narration·revise_scene: scenes.id / generate_scenes: NULL |
+| status | text | `queued`(기본), `running`, `succeeded`, `failed` |
+| stage | text, NULL | `docs/rules/job-status.md`의 처리 단계 |
+| error_code | text, NULL | 실패 사유 코드 |
+| error_message | text, NULL | |
+| attempt | int | 시도 횟수 |
+| started_at, finished_at | timestamptz, NULL | 처리 시간 지표에 사용 |
+
+중복 방지: `(dream_id, type, target_id)`에 `status IN ('queued', 'running')`일 때만 적용되는 부분 유니크 인덱스(`uq_jobs_active`). `NULLS NOT DISTINCT`라서 target_id가 NULL인 generate_scenes도 꿈마다 하나만 진행됩니다.
+
+### narrations — (선택) 나레이션
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| scene_version_id | FK scene_versions | |
+| audio_path | text | `.../v{versionNo}/narration.mp3` |
+| duration | float, NULL | 초 |
+
+### world_entities — (선택) 세계관 인물·장소
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| name | text | |
+| kind | text | `person`, `place` |
+| hair, outfit, age_range, features | text, NULL | 외형 항목 (B2·E2와 통일) |
+
+### evaluations — (선택) 평가 응답
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| dream_id | FK dreams | |
+| render_id | FK renders, NULL | |
+| kind | text | 평가 종류 (E1·E2와 확정 후 CHECK 추가) |
+| condition | text | 비교 조건 |
+| score | smallint | 1~5 |
