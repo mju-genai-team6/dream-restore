@@ -2,6 +2,7 @@
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -14,6 +15,12 @@ class AppError(Exception):
         super().__init__(message)
         self.message = message
         self.detail = detail or {}
+
+
+class ValidationFailed(AppError):
+    """요청 형식은 맞지만 저장된 데이터와 맞지 않는 값 (예: 목록에 없는 id)."""
+
+    status_code, code = 400, "VALIDATION_ERROR"
 
 
 class NotFound(AppError):
@@ -61,5 +68,8 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _validation_error(_: Request, exc: RequestValidationError):
         return JSONResponse(
             status_code=400,
-            content=_body("VALIDATION_ERROR", "요청 값을 확인해 주세요.", {"errors": exc.errors()}),
+            # errors()의 ctx에 예외 객체가 들어 있으면 그대로는 JSON으로 바꿀 수 없다
+            content=_body(
+                "VALIDATION_ERROR", "요청 값을 확인해 주세요.", {"errors": jsonable_encoder(exc.errors())}
+            ),
         )
