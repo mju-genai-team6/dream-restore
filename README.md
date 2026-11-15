@@ -66,6 +66,7 @@ dream-restore/
 | `frontend/` | 결과·보관 흐름 (장면·영상 결과, 보관함) | 인진은 |
 | `backend/app/` | 인터뷰·장면 모듈 | 정은수 |
 | `backend/app/` | 세계관·Job API | 박예나 |
+| `backend/app/db/`, `backend/app/models/`, `backend/alembic/` | DB (PostgreSQL 테이블, 마이그레이션) | 김민진 (C2) |
 | `backend/worker/image_gen/` | 이미지 생성, 인물 일관성 | 김민진 |
 | `backend/worker/postprocess/` | 확신도 블러 | 이종민 |
 | `backend/worker/render/` | FFmpeg 렌더링 | 이종민 |
