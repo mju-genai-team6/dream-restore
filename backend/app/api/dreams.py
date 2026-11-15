@@ -2,8 +2,10 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from sqlalchemy.orm import Session
 
 from app.api.deps import mark_mock
+from app.db.session import get_db
 from app.schemas.common import error_responses
 from app.schemas.dreams import (
     AudioUploadResponse,
@@ -15,7 +17,7 @@ from app.schemas.dreams import (
 )
 from app.services import dreams as dream_service
 
-router = APIRouter(prefix="/dreams", tags=["dreams"], dependencies=[Depends(mark_mock)])
+router = APIRouter(prefix="/dreams", tags=["dreams"])
 
 
 @router.post(
@@ -25,8 +27,10 @@ router = APIRouter(prefix="/dreams", tags=["dreams"], dependencies=[Depends(mark
     summary="꿈 기록 생성",
     responses=error_responses(400),
 )
-def create_dream(body: DreamCreate) -> DreamStatusResponse:
-    return dream_service.create_dream(body)
+def create_dream(
+    body: DreamCreate, db: Annotated[Session, Depends(get_db)]
+) -> DreamStatusResponse:
+    return dream_service.create_dream(db, body)
 
 
 @router.get(
@@ -34,6 +38,7 @@ def create_dream(body: DreamCreate) -> DreamStatusResponse:
     response_model=DreamListResponse,
     summary="꿈 일기 목록 (커서 페이지)",
     responses=error_responses(400),
+    dependencies=[Depends(mark_mock)],
 )
 def list_dreams(
     cursor: str | None = Query(default=None, description="이전 응답의 next_cursor"),
@@ -48,8 +53,10 @@ def list_dreams(
     summary="꿈 기록 조회 (상태, 원문, 인터뷰 진행, 진행 중 작업, 최신 영상)",
     responses=error_responses(404),
 )
-def get_dream(dream_id: int) -> DreamResponse:
-    return dream_service.get_dream(dream_id)
+def get_dream(
+    dream_id: int, db: Annotated[Session, Depends(get_db)]
+) -> DreamResponse:
+    return dream_service.get_dream(db, dream_id)
 
 
 @router.patch(
@@ -58,8 +65,12 @@ def get_dream(dream_id: int) -> DreamResponse:
     summary="원문 확정",
     responses=error_responses(400, 404, 409),
 )
-def confirm_text(dream_id: int, body: DreamConfirm) -> DreamStatusResponse:
-    return dream_service.confirm_text(dream_id, body)
+def confirm_text(
+    dream_id: int,
+    body: DreamConfirm,
+    db: Annotated[Session, Depends(get_db)],
+) -> DreamStatusResponse:
+    return dream_service.confirm_text(db, dream_id, body)
 
 
 @router.post(
@@ -68,6 +79,7 @@ def confirm_text(dream_id: int, body: DreamConfirm) -> DreamStatusResponse:
     status_code=status.HTTP_201_CREATED,
     summary="음성 업로드 (webm·mp4·m4a, 최대 25MB)",
     responses=error_responses(400, 404, 409, 413, 415),
+    dependencies=[Depends(mark_mock)],
 )
 def upload_audio(
     dream_id: int, file: Annotated[UploadFile, File(description="녹음 파일")]

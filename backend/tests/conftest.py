@@ -80,3 +80,17 @@ def db(db_engine: Engine) -> Iterator[Session]:
         session.close()
         outer.rollback()
         connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _api_uses_stub_session() -> Iterator[None]:
+    """임시 저장소 기간에는 API가 실제 DB 세션을 열지 않는다."""
+    from app.db.session import get_db
+    from app.main import app
+
+    def _override() -> Iterator[None]:
+        yield None
+
+    app.dependency_overrides[get_db] = _override
+    yield
+    app.dependency_overrides.pop(get_db, None)

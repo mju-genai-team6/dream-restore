@@ -11,10 +11,7 @@ from app.services import mock_data
 client = TestClient(app)
 
 JSON_CASES = [
-    ("post", "/dreams", {"json": mock_data.DREAM_CREATE}, 201, mock_data.DREAM_CREATED),
     ("get", "/dreams", {}, 200, mock_data.DREAM_LIST),
-    ("get", "/dreams/1", {}, 200, mock_data.DREAM),
-    ("patch", "/dreams/1", {"json": mock_data.DREAM_CONFIRM}, 200, mock_data.DREAM_CONFIRMED),
     (
         "post",
         "/dreams/1/audio",
