@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     app_env: str = "local"
     database_url: str = "postgresql+psycopg://dream:dream@localhost:5432/dream"
+    test_database_url: str = "postgresql+psycopg://dream:dream@localhost:5432/dream_test"
     storage_root: str = "../storage"
     cors_origins: str = "http://localhost:3000"
 

@@ -96,17 +96,38 @@ cp .env.example .env
 ### 3. 사전 설치
 
 - Node.js (LTS), Python 3.11 이상
-- PostgreSQL
+- Docker Desktop (PostgreSQL을 직접 설치하지 않고 컨테이너로 띄웁니다)
 - FFmpeg (`ffmpeg -version`으로 설치 확인)
 
-### 4. 실행 (예정)
+### 4. DB 띄우기
+
+저장소 루트에서 PostgreSQL 16 컨테이너를 실행합니다. 처음 실행할 때 개발 DB(`dream`)와 테스트 DB(`dream_test`)가 함께 만들어집니다.
+
+```bash
+docker compose up -d db
+docker compose ps        # db 상태가 healthy인지 확인
+```
+
+| 용도 | 접속 주소 (`.env`) |
+| --- | --- |
+| 개발 | `DATABASE_URL=postgresql+psycopg://dream:dream@localhost:5432/dream` |
+| 테스트 (pytest 전용) | `TEST_DATABASE_URL=postgresql+psycopg://dream:dream@localhost:5432/dream_test` |
+
+- 직접 들여다보기: `docker compose exec db psql -U dream -d dream`
+- 테이블 만들기·갱신: `cd backend && alembic upgrade head` (스키마 변경은 Alembic으로만, 마이그레이션 파일은 C2만 만듭니다)
+- 완전히 초기화: `docker compose down -v` 후 다시 `up -d db` (데이터가 모두 지워집니다)
+- 5432 포트가 이미 쓰이고 있으면 로컬에 설치된 PostgreSQL을 끄고 다시 실행하세요.
+
+### 5. 실행
 
 ```bash
 # 백엔드
 cd backend
 python -m venv .venv
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+alembic upgrade head
 uvicorn app.main:app --reload
+pytest                   # DB 테스트는 dream_test에서 돌고, 테스트마다 변경을 되돌립니다
 ```
 
 ```bash

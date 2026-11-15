@@ -9,6 +9,13 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # 볼륨이 처음 만들어질 때 한 번 실행: 테스트용 DB(dream_test) 생성
+      - ./backend/scripts/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dream -d dream"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   api:
     build: ./backend
@@ -21,7 +28,8 @@ services:
     volumes:
       - ./storage:/app/storage
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     profiles: ["full"]   # 기본은 db만 실행, 전체 실행은: docker compose --profile full up
 
 volumes:
