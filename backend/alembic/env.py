@@ -1,17 +1,19 @@
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401  모델을 등록해 autogenerate가 인식하도록 함
+from alembic import context
 from app.core.config import settings
 from app.db.base import Base
-import app.models  # noqa: F401  모델을 등록해 autogenerate가 인식하도록 함
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# 기본은 개발 DB. 테스트(conftest.py)는 config.attributes["database_url"]로 dream_test를 넘깁니다.
+database_url = config.attributes.get("database_url") or settings.database_url
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    context.configure(url=settings.database_url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(url=database_url, target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
