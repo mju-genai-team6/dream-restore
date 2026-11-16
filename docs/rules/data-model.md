@@ -186,3 +186,62 @@ erDiagram
 | kind | text | 평가 종류 (E1·E2와 확정 후 CHECK 추가) |
 | condition | text | 비교 조건 |
 | score | smallint | 1~5 |
+
+## 지표 뷰
+
+검증 지표는 `SELECT * FROM 뷰이름`으로 바로 꺼낼 수 있습니다. 정의는 `backend/alembic/versions/5ccb1fbaa197_metric_views.py`.
+
+```bash
+docker compose exec db psql -U dream -d dream -c "SELECT * FROM v_interview_comparison"
+```
+
+### v_interview_comparison — 인터뷰 전후 비교 (D)
+
+꿈 기록별 한 행. 원문 추출(`raw`)이 있는 꿈만 나오고, 같은 단계를 여러 번 추출했으면 마지막 것을 씁니다.
+
+| 컬럼 | 설명 |
+| --- | --- |
+| dream_id, created_at | |
+| raw_element_count, after_element_count | 인터뷰 전·후 요소 수 (인터뷰 전이면 after는 NULL) |
+| element_increase | 요소 수 증가량 |
+| raw_text_length, after_text_length | 추출에 쓴 텍스트 글자 수 (`save_extraction`의 text_length) |
+| text_length_increase | 글자 수 증가량 |
+
+평균 증가량: `SELECT avg(element_increase), avg(text_length_increase) FROM v_interview_comparison`
+
+### v_confidence_evaluation — 확신도 평가 (E1)
+
+`evaluations.kind = 'confidence'` 응답을 조건(`condition`)별로 묶습니다.
+
+| 컬럼 | 설명 |
+| --- | --- |
+| condition | 비교 조건 (예: 블러 적용/미적용) |
+| response_count | 응답 수 |
+| avg_score | 5점 평가 평균 (소수 둘째 자리) |
+
+### v_character_consistency — 인물 일관성 평가 (E2)
+
+`evaluations.kind = 'character'` 응답을 조건별로 묶습니다. **점수 4 이상을 "같은 인물로 인식"으로 봅니다.**
+
+| 컬럼 | 설명 |
+| --- | --- |
+| condition | 비교 조건 (예: 세계관 인물 적용/미적용) |
+| response_count | 응답 수 |
+| recognized_count | 같은 인물로 인식한 응답 수 |
+| recognized_ratio | 인식 비율 (0~1, 소수 셋째 자리) |
+| avg_score | 5점 평균 |
+
+### v_processing_time — 처리 시간 (C, 전원)
+
+성공한 작업이 하나라도 있는 꿈 기록별 한 행. 단위는 초, 해당 작업이 없으면 NULL.
+
+| 컬럼 | 설명 |
+| --- | --- |
+| scene_split_seconds | 마지막으로 성공한 `generate_scenes`의 started_at~finished_at |
+| image_gen_seconds | 성공한 `generate_image` 중 가장 먼저 시작~가장 늦게 끝난 시간 (장면 병렬 처리를 포함한 체감 시간) |
+| image_job_count | 성공한 `generate_image` 수 |
+| render_seconds | 마지막으로 성공한 `render_video`의 started_at~finished_at |
+
+`started_at`, `finished_at`은 `repositories.jobs.update_job`이 상태를 바꿀 때 기록합니다.
+
+> 뷰가 참조하는 컬럼을 바꾸는 마이그레이션은 먼저 뷰를 지우고(`DROP VIEW`) 다시 만들어야 합니다.
