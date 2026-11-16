@@ -1,4 +1,4 @@
-# TODO(DB 담당): repositories로 교체 (my-docs/requests.md 요청: mark_interrupted의 queued 처리)
+# TODO(DB 담당): repositories로 교체 (my-docs/requests.md: claim_job, mark_interrupted의 queued·id 목록)
 """repositories에 아직 없는 함수를 요청한 이름·시그니처 그대로 실제 DB 세션으로 구현한다.
 
 모델 직접 사용은 이 파일 안에서만 허용한다. repositories 약속과 같게 commit하지 않고 flush까지만 한다.
@@ -10,6 +10,22 @@ from app.core.enums import FailureCode, JobStatus
 from app.models.job import ACTIVE_JOB_STATUSES, Job
 
 QUEUED_INTERRUPTED_MESSAGE = "서버가 다시 시작되어 작업이 중단되었습니다. 다시 시도해 주세요."
+
+
+# TODO(DB 담당): repositories.claim_job 으로 교체
+def claim_job(db: Session, job_id: int) -> bool:
+    """queued인 작업을 running으로 바꾼다. 바뀐 행이 있으면 True.
+
+    started_at은 이 변경에서 기록한다. 동시에 두 실행기가 같은 작업을 시작해도 한 쪽만 True다.
+    commit은 호출하는 쪽이 한다.
+    """
+    result = db.execute(
+        update(Job)
+        .where(Job.id == job_id, Job.status == JobStatus.QUEUED.value)
+        .values(status=JobStatus.RUNNING.value, started_at=func.now())
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount == 1
 
 
 def list_active_job_ids(db: Session) -> list[int]:

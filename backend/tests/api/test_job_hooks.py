@@ -1,6 +1,7 @@
 """작업 성공·실패 후처리. 핸들러와 후처리는 테스트 안에서만 끼운다."""
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi import BackgroundTasks
@@ -323,3 +324,100 @@ def test_submit_job_returns_the_active_job(monkeypatch, session_factory, read_db
     [job] = rows.jobs(read_db)
     assert job.id == first.id
     assert job.status == JobStatus.QUEUED
+
+
+def test_concurrent_submit_runs_handler_once(monkeypatch, session_factory, read_db):
+    """다섯 요청이 겹쳐도 핸들러는 한 번이다. 첫 실행은 나머지가 끝날 때까지 running으로 둔다."""
+    dream_id = _dream()
+    calls: list[int] = []
+    lock = threading.Lock()
+    release = threading.Event()
+    state = {"inside": 0, "outside": 0}
+
+    def handle(ctx, payload):
+        with lock:
+            calls.append(ctx.job_id)
+            state["inside"] += 1
+            if state["inside"] + state["outside"] >= 5:
+                release.set()
+        assert release.wait(5)
+        return {}
+
+    def run_now(background_tasks, job_id, payload=None):
+        runner.run_job(job_id, payload or {})
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+    monkeypatch.setattr(runner, "schedule", run_now)
+    barrier = threading.Barrier(5)
+
+    def once():
+        barrier.wait(5)
+        try:
+            with session_factory() as db:
+                submit_job(
+                    db,
+                    BackgroundTasks(),
+                    dream_id=dream_id,
+                    job_type=JobType.GENERATE_SCENES,
+                    target_id=None,
+                )
+        finally:
+            with lock:
+                state["outside"] += 1
+                if state["inside"] >= 1 and state["inside"] + state["outside"] >= 5:
+                    release.set()
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = [pool.submit(once) for _ in range(5)]
+        for future in futures:
+            future.result(timeout=30)
+    assert len(calls) == 1
+    assert len(set(calls)) == 1
+    read_db.expire_all()
+    [job] = rows.jobs(read_db)
+    assert calls == [job.id]
+    assert job.status == JobStatus.SUCCEEDED
+
+
+def test_second_run_job_does_nothing(monkeypatch, session_factory, read_db):
+    dream_id = _dream()
+    job_id = _job(session_factory, dream_id)
+    handler_calls: list[int] = []
+    success_calls: list[int] = []
+    failure_calls: list[int] = []
+    events: list[object] = []
+
+    def handle(ctx, payload):
+        handler_calls.append(ctx.job_id)
+        return {}
+
+    def on_success(db, job, result):
+        success_calls.append(job.id)
+
+    def on_failure(db, job, error_code, error_message):
+        failure_calls.append(job.id)
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+    monkeypatch.setitem(ON_SUCCESS, JobType.GENERATE_SCENES, on_success)
+    monkeypatch.setitem(ON_FAILURE, JobType.GENERATE_SCENES, on_failure)
+    monkeypatch.setattr(runner, "publish_job_event", events.append)
+
+    runner.run_job(job_id, {})
+    assert handler_calls == [job_id]
+    handler_calls.clear()
+    success_calls.clear()
+    failure_calls.clear()
+    events.clear()
+
+    runner.run_job(job_id, {})
+
+    assert handler_calls == []
+    assert success_calls == []
+    assert failure_calls == []
+    assert events == []
+    read_db.expire_all()
+    [job] = rows.jobs(read_db)
+    assert job.id == job_id
+    assert job.status == JobStatus.SUCCEEDED
+    assert job.attempt == 1
+    assert job.started_at is not None

@@ -7,6 +7,8 @@
 - 성공 후처리(on_success)와 succeeded는 같은 세션에서 한 번에 commit한다. 후처리가 실패하면 핸들러는 다시 실행하지 않는다
 - on_failure는 최종 실패와 서버 시작 시 INTERRUPTED에서만 호출한다. 재시도 중간에는 호출하지 않는다
 - 실패 후처리가 예외를 내도 실행기는 멈추지 않는다. 작업은 그 전에 failed로 commit되어 있다
+- 시작 시 claim_job으로 queued를 running으로 한 번만 가져간다. 못 가져가면 핸들러·이벤트·후처리 없이 끝낸다
+- 재시도는 이미 가져온 작업의 루프 안에서 이어지므로 claim_job을 다시 부르지 않는다
 - SSE(publish_job_event)는 commit 뒤에 보낸다
 - 서버 재시작 시 running·queued 작업은 INTERRUPTED로 실패 처리 (recover_interrupted)
 - 이미지 생성 동시 요청 수는 settings.image_max_concurrency로 제한 (C-S3-02)
@@ -159,9 +161,16 @@ def _complete(db: Session, job_id: int, result: dict) -> None:
 
 
 def _run(db: Session, job_id: int, payload: dict) -> None:
-    job = job_repo.get_job(db, job_id)
-    if job is None or job.status != JobStatus.QUEUED:
+    # 재시도는 아래 루프에서 이어진다. claim은 처음 한 번만 해서 running인 재시도를 건너뛰지 않는다.
+    claimed = repo_bridge.claim_job(db, job_id)
+    commit(db)
+    if not claimed:
+        job = job_repo.get_job(db, job_id)
         logger.warning("작업 %s를 실행하지 않음 (상태: %s)", job_id, None if job is None else job.status)
+        return
+    job = job_repo.get_job(db, job_id)
+    if job is None:
+        logger.warning("작업 %s를 실행하지 않음 (상태: %s)", job_id, None)
         return
     handler = get_handler(job.type)
     if handler is None:
