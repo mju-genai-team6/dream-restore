@@ -245,3 +245,37 @@ docker compose exec db psql -U dream -d dream -c "SELECT * FROM v_interview_comp
 `started_at`, `finished_at`은 `repositories.jobs.update_job`이 상태를 바꿀 때 기록합니다.
 
 > 뷰가 참조하는 컬럼을 바꾸는 마이그레이션은 먼저 뷰를 지우고(`DROP VIEW`) 다시 만들어야 합니다.
+
+## 샘플·시연 데이터와 백업
+
+### 샘플 데이터 (`backend/scripts/seed.py`)
+
+익명 샘플 꿈 5건을 상태별로 1건씩 넣습니다. 실제 AI 처리 없이 화면을 확인할 때 씁니다.
+
+| id | 상태 | 들어 있는 데이터 |
+| --- | --- | --- |
+| 1 | rendered | D의 예시 JSON(학교 복도) 그대로. 인터뷰 6문항(1개 기억 안 남), 재추출, 확신도, 장면 3개, 이미지, 완료된 영상 |
+| 2 | images_ready | 장면 3개 이미지 완료, 영상 없음 |
+| 3 | scenes_ready | 장면 3개 중 이미지 1개 완료, 1개 생성 중(running), 1개 대기(queued) |
+| 4 | interviewing | 질문 5개 중 2개 진행 (답변 1, 기억 안 남 1) |
+| 5 | recorded | 음성 입력, 원문 확정 전 |
+
+- DB에는 경로 문자열만 들어가고 이미지·영상 파일은 만들지 않습니다.
+- 1번 외 4건은 임시 문장입니다. D의 익명화 테스트 데이터가 정리되면 `SAMPLE_DREAMS`를 교체합니다.
+- **실제 참가자의 꿈 기록은 샘플·저장소·외부에 공유하지 않습니다.** 사용자 테스트가 끝난 뒤 원문을 지우고 지표만 남길지는 팀에서 정합니다.
+
+### 초기화 (`backend/scripts/reset_db.py`)
+
+로컬 DB의 테이블을 모두 지우고 `alembic upgrade head` → `seed.py` 순서로 다시 만듭니다. `APP_ENV=local`이고 DB 주소가 localhost일 때만 실행되며, 실행 전에 확인을 묻습니다(`--yes`로 생략, `--no-seed`로 샘플 제외).
+
+### 백업 (기능 동결일 11/28)
+
+시연에 쓸 DB를 파일로 남기고, 필요하면 그대로 되돌립니다. 백업 파일은 Git에 올리지 않습니다.
+
+```bash
+# 백업 (저장소 루트에서)
+docker compose exec -T db pg_dump -U dream -d dream --format=custom > backup_20261128.dump
+
+# 복원 (기존 데이터를 지우고 백업 시점으로)
+docker compose exec -T db pg_restore -U dream -d dream --clean --if-exists < backup_20261128.dump
+```
