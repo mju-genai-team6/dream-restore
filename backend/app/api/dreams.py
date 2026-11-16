@@ -78,10 +78,13 @@ def confirm_text(
     response_model=AudioUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="음성 업로드 (webm·mp4·m4a, 최대 25MB)",
-    responses=error_responses(400, 404, 409, 413, 415),
-    dependencies=[Depends(mark_mock)],
+    responses=error_responses(400, 404, 409, 413, 415, 502, 504),
 )
 def upload_audio(
-    dream_id: int, file: Annotated[UploadFile, File(description="녹음 파일")]
+    dream_id: int,
+    file: Annotated[UploadFile, File(description="녹음 파일")],
+    db: Annotated[Session, Depends(get_db)],
 ) -> AudioUploadResponse:
-    return dream_service.upload_audio(dream_id)
+    return dream_service.upload_audio(
+        db, dream_id, filename=file.filename, content_type=file.content_type, fileobj=file.file
+    )

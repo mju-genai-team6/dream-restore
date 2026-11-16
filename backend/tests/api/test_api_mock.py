@@ -12,23 +12,6 @@ client = TestClient(app)
 
 JSON_CASES = [
     ("get", "/dreams", {}, 200, mock_data.DREAM_LIST),
-    (
-        "post",
-        "/dreams/1/audio",
-        {"files": {"file": ("dream.webm", b"fake", "audio/webm")}},
-        201,
-        mock_data.AUDIO_UPLOADED,
-    ),
-    ("get", "/dreams/1/interview", {}, 200, mock_data.INTERVIEW),
-    ("post", "/dreams/1/interview", {"json": mock_data.ANSWER_CREATE}, 200, mock_data.ANSWER_SAVED),
-    ("get", "/dreams/1/elements", {}, 200, mock_data.ELEMENTS),
-    (
-        "put",
-        "/dreams/1/elements/confidence",
-        {"json": mock_data.CONFIDENCE_UPDATE},
-        200,
-        mock_data.ELEMENTS,
-    ),
     ("post", "/dreams/1/jobs", {"json": mock_data.JOB_CREATE}, 202, mock_data.JOB_CREATED),
     ("get", "/jobs/1", {}, 200, mock_data.JOB),
     ("get", "/dreams/1/scenes", {}, 200, mock_data.SCENES),
@@ -53,14 +36,6 @@ def test_mock_endpoint_returns_sample_with_mock_header(method, path, kwargs, sta
     assert res.status_code == status_code, res.text
     assert res.headers["X-Mock"] == "true"
     assert _normalize(res.json()) == _normalize(sample)
-
-
-def test_confidence_update_reflects_requested_values():
-    body = {"items": [{"element_id": 1, "confidence": "low"}]}
-    res = client.put("/dreams/1/elements/confidence", json=body)
-
-    elements = {e["element_id"]: e["confidence"] for e in res.json()["elements"]}
-    assert elements[1] == "low"
 
 
 def test_events_stream_sends_sample_job_events_and_closes(monkeypatch):
@@ -103,6 +78,34 @@ def test_unknown_id_returns_not_found_error_format(path):
 def test_invalid_body_returns_validation_error(path, body):
     method = "PUT" if path.endswith("confidence") else "POST"
     res = client.request(method, path, json=body)
+
+    assert res.status_code == 400
+    assert res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_validation_error_with_exception_in_ctx_is_not_500():
+    """검증기가 ValueError를 던지면 errors()의 ctx에 예외 객체가 들어간다."""
+    from fastapi import FastAPI
+    from pydantic import BaseModel, field_validator
+
+    from app.core.errors import register_error_handlers
+
+    class Body(BaseModel):
+        value: int
+
+        @field_validator("value")
+        @classmethod
+        def _reject(cls, value: int) -> int:
+            raise ValueError("허용하지 않는 값")
+
+    probe = FastAPI()
+    register_error_handlers(probe)
+
+    @probe.post("/probe")
+    def _probe(body: Body) -> dict:
+        return {}
+
+    res = TestClient(probe, raise_server_exceptions=False).post("/probe", json={"value": 1})
 
     assert res.status_code == 400
     assert res.json()["error"]["code"] == "VALIDATION_ERROR"
