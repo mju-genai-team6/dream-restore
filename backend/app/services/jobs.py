@@ -8,7 +8,6 @@ from app.jobs import runner
 from app.repositories import extractions as extraction_repo
 from app.repositories import jobs as job_repo
 from app.schemas.jobs import JobCreate, JobSummary
-from app.services import repo_bridge
 from app.services.events import publish_job_event
 from app.services.interview import require_dream
 from app.services.job_views import job_summary
@@ -20,7 +19,7 @@ def _ensure_scenes_requestable(db: Session, dream_id: int) -> None:
     dream = require_dream(db, dream_id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING:
         raise InvalidState("현재 단계에서는 장면을 만들 수 없습니다.", {"status": dream.status})
-    latest = repo_bridge.get_latest_extraction(db, dream_id)
+    latest = extraction_repo.get_latest_extraction(db, dream_id)
     if latest is None or latest.phase != ExtractionPhase.AFTER_INTERVIEW:
         raise InvalidState("요소 목록을 먼저 확인해 주세요.", {"status": dream.status})
     elements = extraction_repo.list_elements(db, dream_id)
@@ -42,7 +41,7 @@ def create_job(
         # 잠금을 기다리는 동안 다른 요청이 상태를 바꿨을 수 있어 DB에서 다시 읽는다
         expire_loaded(db)
         _ensure_scenes_requestable(db, dream_id)
-        active = {job.id for job in repo_bridge.get_active_jobs(db, dream_id)}
+        active = {job.id for job in job_repo.get_active_jobs(db, dream_id)}
         try:
             job = job_repo.create_job_or_get_active(db, dream_id, JobType(body.type))
             commit(db)

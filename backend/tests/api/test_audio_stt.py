@@ -13,7 +13,6 @@ from app.db.session import get_db
 from app.main import app
 from app.repositories import dreams as dream_repo
 from app.services import dreams as dream_service
-from app.services import repo_bridge
 from app.services.llm_calls import STT_FAILED_MESSAGE, dream_lock
 from tests.api import rows
 from tests.audio_fakes import TRANSCRIPT, WEBM_BYTES, FakeTranscribe
@@ -141,7 +140,7 @@ def test_raw_text_save_failure_keeps_audio_record(storage_root: Path, monkeypatc
     def _broken(*args, **kwargs):
         raise RuntimeError("raw_text 저장 실패")
 
-    monkeypatch.setattr(repo_bridge, "update_raw_text", _broken)
+    monkeypatch.setattr(dream_repo, "update_raw_text", _broken)
 
     res = _upload(dream_id, api=TestClient(app, raise_server_exceptions=False))
 

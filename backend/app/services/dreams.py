@@ -19,6 +19,7 @@ from app.models.dream import Dream
 from app.repositories import audio as audio_repo
 from app.repositories import dreams as dream_repo
 from app.repositories import interview as interview_repo
+from app.repositories import jobs as job_repo
 from app.repositories import renders as render_repo
 from app.repositories.renders import LatestRender
 from app.schemas.dreams import (
@@ -31,7 +32,7 @@ from app.schemas.dreams import (
     InterviewProgress,
 )
 from app.schemas.renders import RenderSummary
-from app.services import mock_data, repo_bridge
+from app.services import mock_data
 from app.services.job_views import job_summary
 from app.services.llm_calls import STT_FAILED_MESSAGE, call_stt, dream_lock
 from app.services.transactions import commit, expire_loaded, rollback
@@ -89,9 +90,11 @@ def get_dream(db: Session, dream_id: int) -> DreamResponse:
     answered, total = interview_repo.get_progress(db, dream_id)
     # active_job은 generate_scenes·render_video 중 진행 중인 하나만 담는다.
     # generate_image 진행은 장면 목록과 SSE에서 보여 준다.
-    active_job = next(
-        (job for job in repo_bridge.get_active_jobs(db, dream_id) if job.type in _DREAM_JOB_TYPES),
-        None,
+    # repositories의 정렬 순서에 기대지 않고 (created_at, id)가 가장 큰 작업을 고른다
+    active_job = max(
+        (job for job in job_repo.get_active_jobs(db, dream_id) if job.type in _DREAM_JOB_TYPES),
+        key=lambda job: (job.created_at, job.id),
+        default=None,
     )
     return DreamResponse(
         dream_id=dream.id,
@@ -238,7 +241,7 @@ def upload_audio(
         if not text:
             raise SttFailed(STT_FAILED_MESSAGE)
         try:
-            repo_bridge.update_raw_text(db, dream_id, text)
+            dream_repo.update_raw_text(db, dream_id, text)
             commit(db)
         except Exception:
             rollback(db)

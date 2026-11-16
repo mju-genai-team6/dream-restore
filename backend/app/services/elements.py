@@ -10,8 +10,8 @@ from app.models.interview import DreamElement, Extraction
 from app.repositories import InvalidData
 from app.repositories import extractions as extraction_repo
 from app.repositories import interview as interview_repo
+from app.repositories import jobs as job_repo
 from app.schemas.elements import ConfidenceUpdate, ElementItem, ElementListResponse
-from app.services import repo_bridge
 from app.services.interview import confirmed_text, require_dream
 from app.services.llm_calls import call_llm, dream_lock
 from app.services.transactions import commit, expire_loaded, rollback
@@ -47,13 +47,13 @@ def _ensure_interview_done(db: Session, dream: Dream) -> None:
 
 def list_elements(db: Session, dream_id: int) -> ElementListResponse:
     dream = require_dream(db, dream_id)
-    if _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
+    if _is_after_interview(extraction_repo.get_latest_extraction(db, dream_id)):
         return _element_response(extraction_repo.list_elements(db, dream_id))
 
     _ensure_interview_done(db, dream)
     text = confirmed_text(dream)
     with dream_lock(dream_id):
-        if _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
+        if _is_after_interview(extraction_repo.get_latest_extraction(db, dream_id)):
             return _element_response(extraction_repo.list_elements(db, dream_id))
         answers = [
             InterviewAnswer(question=row.text, answer=None if row.skipped else row.answer)
@@ -89,12 +89,12 @@ def _set_confidences(db: Session, dream_id: int, body: ConfidenceUpdate) -> Elem
     dream = require_dream(db, dream_id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING:
         raise InvalidState("현재 단계에서는 확신도를 저장할 수 없습니다.", {"status": dream.status})
-    if not _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
+    if not _is_after_interview(extraction_repo.get_latest_extraction(db, dream_id)):
         raise InvalidState("요소 목록을 먼저 확인해 주세요.", {"status": dream.status})
     # failed 작업은 막지 않는다. 확신도를 고친 뒤 다시 요청할 수 있다
     # TODO(C-S3-01): 가짜 작업 성공 후에도 막히는지 확인 (scenes_ready로 바뀌면 위 상태 검사로 막힘)
     scenes_job = next(
-        (job for job in repo_bridge.get_active_jobs(db, dream_id) if job.type == JobType.GENERATE_SCENES),
+        (job for job in job_repo.get_active_jobs(db, dream_id) if job.type == JobType.GENERATE_SCENES),
         None,
     )
     if scenes_job is not None:

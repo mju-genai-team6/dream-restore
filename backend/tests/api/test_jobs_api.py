@@ -344,6 +344,21 @@ def test_dream_active_job_shows_scenes_job_only(hold_jobs, session_factory: sess
     assert active["dream_id"] == dream_id
 
 
+def test_dream_active_job_is_latest_of_dream_jobs(session_factory: sessionmaker[Session]):
+    """꿈 단위 작업 두 개가 함께 진행 중이면 (created_at, id)가 가장 큰 작업을 보여 준다."""
+    dream_id = client.post("/dreams", json=TEXT).json()["dream_id"]
+    with session_factory.begin() as db:
+        job_repo.create_job_or_get_active(db, dream_id, JobType.GENERATE_SCENES)
+    with session_factory.begin() as db:
+        latest = job_repo.create_job_or_get_active(db, dream_id, JobType.RENDER_VIDEO, target_id=1)
+    with session_factory.begin() as db:
+        job_repo.create_job_or_get_active(db, dream_id, JobType.GENERATE_IMAGE, target_id=1)
+
+    active = client.get(f"/dreams/{dream_id}").json()["active_job"]
+    assert active["job_id"] == latest.id
+    assert active["type"] == "render_video"
+
+
 def test_dream_active_job_is_null_after_job_finishes():
     dream_id, _ = _ready_dream()
     assert _job(_request(dream_id).json()["job_id"])["status"] == "succeeded"
