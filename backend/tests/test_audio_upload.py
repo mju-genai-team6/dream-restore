@@ -1,4 +1,4 @@
-"""음성 업로드 저장 API (C-S1-06)."""
+"""음성 업로드 저장 API (C-S1-06, 형식 판별은 C-S2-01)."""
 import re
 from pathlib import Path
 
@@ -9,13 +9,13 @@ from app.core.config import settings
 from app.core.enums import DreamStatus
 from app.main import app
 from app.services import dreams as dream_service
-from app.services import mock_data
 from app.services.stubs import dreams as dream_repo
 from app.services.stubs import store
+from tests.audio_fakes import MP4_BYTES, TRANSCRIPT, WEBM_BYTES, FakeTranscribe
 
 client = TestClient(app)
 
-AUDIO_BYTES = b"\x1aE\xdf\xa3fake-webm"
+AUDIO_BYTES = WEBM_BYTES
 MB = 1024 * 1024
 
 
@@ -25,6 +25,13 @@ def storage_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(settings, "storage_path", tmp_path)
     yield tmp_path
     store.clear()
+
+
+@pytest.fixture(autouse=True)
+def stt(monkeypatch: pytest.MonkeyPatch) -> FakeTranscribe:
+    fake = FakeTranscribe()
+    monkeypatch.setattr(dream_service, "transcribe", fake)
+    return fake
 
 
 def _voice_dream() -> int:
@@ -39,15 +46,15 @@ def _stored_files(root: Path) -> list[Path]:
     return [p for p in root.rglob("*") if p.is_file()]
 
 
-def test_upload_saves_file_under_audio_path(storage_root: Path):
+def test_upload_saves_file_under_audio_path(storage_root: Path, stt: FakeTranscribe):
     dream_id = _voice_dream()
 
     res = _upload(dream_id, content_type="audio/webm;codecs=opus")
 
     assert res.status_code == 201, res.text
-    assert res.headers["X-Mock"] == "true"
+    assert "X-Mock" not in res.headers
     body = res.json()
-    assert body["transcript"] == mock_data.RAW_TEXT
+    assert body["transcript"] == TRANSCRIPT
     audio = store.audio_files[body["audio_id"]]
     assert audio.dream_id == dream_id
     assert re.fullmatch(rf"dreams/{dream_id}/audio/[0-9a-f]{{32}}\.webm", audio.path)
@@ -58,10 +65,37 @@ def test_upload_saves_file_under_audio_path(storage_root: Path):
     assert _stored_files(storage_root) == [storage_root / audio.path]
 
 
-def test_audio_m4a_is_recorded_as_x_m4a():
+def test_transcribe_gets_absolute_path_of_saved_file(storage_root: Path, stt: FakeTranscribe):
     dream_id = _voice_dream()
 
-    res = _upload(dream_id, filename="dream.m4a", content_type="audio/m4a")
+    res = _upload(dream_id, filename="dream.webm", content_type="audio/webm", data=MP4_BYTES)
+
+    assert res.status_code == 201, res.text
+    audio = store.audio_files[res.json()["audio_id"]]
+    [called] = stt.paths
+    path = Path(called)
+    assert path.is_absolute()
+    assert path == (storage_root / audio.path).resolve()
+    assert path.suffix == ".mp4"
+
+
+def test_mp4_content_named_webm_is_saved_as_mp4(storage_root: Path):
+    dream_id = _voice_dream()
+
+    res = _upload(dream_id, filename="dream.webm", content_type="audio/webm", data=MP4_BYTES)
+
+    assert res.status_code == 201, res.text
+    audio = store.audio_files[res.json()["audio_id"]]
+    assert audio.mime_type == "audio/mp4"
+    assert audio.path.endswith(".mp4")
+    assert (storage_root / audio.path).read_bytes() == MP4_BYTES
+
+
+@pytest.mark.parametrize("content_type", ["audio/m4a", "audio/x-m4a"])
+def test_mp4_content_with_m4a_type_is_recorded_as_x_m4a(content_type: str):
+    dream_id = _voice_dream()
+
+    res = _upload(dream_id, filename="dream.webm", content_type=content_type, data=MP4_BYTES)
 
     assert res.status_code == 201, res.text
     audio = store.audio_files[res.json()["audio_id"]]
@@ -69,19 +103,49 @@ def test_audio_m4a_is_recorded_as_x_m4a():
     assert audio.path.endswith(".m4a")
 
 
-@pytest.mark.parametrize(
-    ("filename", "content_type"),
-    [("dream.wav", "audio/wav"), ("dream.mp3", "audio/webm"), ("dream", "audio/webm")],
-)
-def test_unsupported_format_returns_415(storage_root: Path, filename: str, content_type: str):
+def test_webm_content_with_mp4_type_is_saved_as_webm():
     dream_id = _voice_dream()
 
-    res = _upload(dream_id, filename=filename, content_type=content_type)
+    res = _upload(dream_id, filename="dream.m4a", content_type="audio/mp4", data=WEBM_BYTES)
+
+    assert res.status_code == 201, res.text
+    audio = store.audio_files[res.json()["audio_id"]]
+    assert audio.mime_type == "audio/webm"
+    assert audio.path.endswith(".webm")
+
+
+@pytest.mark.parametrize("filename", ["dream.mp3", "dream"])
+def test_client_filename_extension_is_ignored(filename: str):
+    dream_id = _voice_dream()
+
+    res = _upload(dream_id, filename=filename, data=WEBM_BYTES)
+
+    assert res.status_code == 201, res.text
+    assert store.audio_files[res.json()["audio_id"]].path.endswith(".webm")
+
+
+@pytest.mark.parametrize(
+    ("content_type", "data"),
+    [
+        ("audio/wav", WEBM_BYTES),
+        ("audio/ogg", MP4_BYTES),
+        ("audio/webm", b"RIFF\x24\x00\x00\x00WAVEfmt "),
+        ("audio/mp4", b"\x1a\x45\xdf"),
+        ("audio/webm", b""),
+    ],
+)
+def test_unsupported_format_returns_415(
+    storage_root: Path, stt: FakeTranscribe, content_type: str, data: bytes
+):
+    dream_id = _voice_dream()
+
+    res = _upload(dream_id, content_type=content_type, data=data)
 
     assert res.status_code == 415
     assert res.json()["error"]["code"] == "UNSUPPORTED_AUDIO"
     assert store.audio_files == {}
     assert _stored_files(storage_root) == []
+    assert stt.paths == []
 
 
 def test_large_content_length_is_rejected_before_handler(storage_root: Path, monkeypatch: pytest.MonkeyPatch):
@@ -116,10 +180,15 @@ def test_large_file_without_content_length_is_stopped_while_copying(
     monkeypatch.setattr(dream_service, "upload_audio", _spy)
     boundary = "audio-test-boundary"
     body = (
-        f"--{boundary}\r\n"
-        'Content-Disposition: form-data; name="file"; filename="dream.webm"\r\n'
-        "Content-Type: audio/webm\r\n\r\n"
-    ).encode() + b"0" * int(1.5 * MB) + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="file"; filename="dream.webm"\r\n'
+            "Content-Type: audio/webm\r\n\r\n"
+        ).encode()
+        + WEBM_BYTES
+        + b"0" * int(1.5 * MB)
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     # 반복자 본문은 Content-Length 없이 chunked로 전송된다
     res = client.post(
@@ -165,13 +234,13 @@ def test_unknown_dream_returns_404():
 def test_reupload_records_new_file(storage_root: Path):
     dream_id = _voice_dream()
 
-    first = _upload(dream_id, data=b"first")
-    second = _upload(dream_id, data=b"second")
+    first = _upload(dream_id, data=WEBM_BYTES + b"first")
+    second = _upload(dream_id, data=WEBM_BYTES + b"second")
 
     assert first.status_code == second.status_code == 201
     first_audio = store.audio_files[first.json()["audio_id"]]
     second_audio = store.audio_files[second.json()["audio_id"]]
     assert first_audio.id != second_audio.id
     assert first_audio.path != second_audio.path
-    assert (storage_root / first_audio.path).read_bytes() == b"first"
-    assert (storage_root / second_audio.path).read_bytes() == b"second"
+    assert (storage_root / first_audio.path).read_bytes() == WEBM_BYTES + b"first"
+    assert (storage_root / second_audio.path).read_bytes() == WEBM_BYTES + b"second"

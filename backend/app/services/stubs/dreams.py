@@ -26,9 +26,18 @@ def get_dream(db: Session | None, dream_id: int) -> Dream | None:
     return store.dreams.get(dream_id)
 
 
-def update_confirmed_text(db: Session | None, dream_id: int, confirmed_text: str) -> Dream:
+def update_confirmed_text(db: Session | None, dream_id: int, confirmed_text: str | None) -> Dream:
+    """None이면 확정 원문을 비운다 (음성을 다시 올렸을 때)."""
     dream = store.dreams[dream_id]
     dream.confirmed_text = confirmed_text
+    dream.updated_at = store.now()
+    return dream
+
+
+# TODO(DB 담당): repositories.dreams.update_raw_text 로 교체 (requests.md 요청)
+def update_raw_text(db: Session | None, dream_id: int, raw_text: str) -> Dream:
+    dream = store.dreams[dream_id]
+    dream.raw_text = raw_text
     dream.updated_at = store.now()
     return dream
 

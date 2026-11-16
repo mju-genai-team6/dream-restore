@@ -1,4 +1,4 @@
-"""요청 안에서 LLM을 부르는 처리(질문 생성, 재추출)의 공통 부분: 꿈별 잠금, 오류 변환."""
+"""요청 안에서 LLM을 부르는 처리(질문 생성, 재추출, STT)의 공통 부분: 꿈별 잠금, 오류 변환."""
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -6,10 +6,13 @@ from typing import TypeVar
 
 import openai
 
-from app.core.errors import LlmFailed, UpstreamTimeout
-from app.llm.client import LlmCallError, LlmSchemaError
+from app.core.errors import LlmFailed, SttFailed, UpstreamTimeout
+from app.llm.client import LlmCallError, LlmError, LlmSchemaError
 
 T = TypeVar("T")
+
+TIMEOUT_MESSAGE = "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요."
+STT_FAILED_MESSAGE = "음성을 텍스트로 변환하지 못했습니다. 다시 녹음하거나 텍스트로 입력해 주세요."
 
 _locks: dict[int, threading.Lock] = {}
 _locks_guard = threading.Lock()
@@ -31,7 +34,21 @@ def call_llm(func: Callable[..., T], *args, failed_message: str) -> T:
     except LlmCallError as exc:
         # TODO(D): LlmTimeoutError가 추가되면 __cause__ 대신 그 예외로 판별
         if isinstance(exc.__cause__, openai.APITimeoutError):
-            raise UpstreamTimeout("AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.") from exc
+            raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
         raise LlmFailed(failed_message) from exc
     except LlmSchemaError as exc:
         raise LlmFailed(failed_message) from exc
+
+
+def call_stt(func: Callable[..., T], *args) -> T:
+    """STT 예외를 API 오류로 바꾼다. 시간 초과는 504, 그 밖은 502 STT_FAILED.
+
+    키가 없으면 transcribe가 SttError가 아닌 LlmCallError를 던지므로 LlmError 전체를 잡는다.
+    """
+    try:
+        return func(*args)
+    except LlmError as exc:
+        # TODO(D): LlmTimeoutError·SttEmptyResultError가 추가되면 __cause__ 대신 그 예외로 판별
+        if isinstance(exc.__cause__, openai.APITimeoutError):
+            raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
+        raise SttFailed(STT_FAILED_MESSAGE) from exc

@@ -78,8 +78,7 @@ def confirm_text(
     response_model=AudioUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="음성 업로드 (webm·mp4·m4a, 최대 25MB)",
-    responses=error_responses(400, 404, 409, 413, 415),
-    dependencies=[Depends(mark_mock)],
+    responses=error_responses(400, 404, 409, 413, 415, 502, 504),
 )
 def upload_audio(
     dream_id: int,
