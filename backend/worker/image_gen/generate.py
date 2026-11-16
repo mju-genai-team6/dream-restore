@@ -9,7 +9,11 @@ payload (Job API가 넣어 줌):
     image_prompt_en: str       D가 만든 장면 프롬프트 (app/llm/schemas.py Scene.image_prompt_en)
     characters: list[dict]     (선택) [{"name": "할머니", "appearance": "white hair, pink cardigan, ..."}]
     style_prompt: str          (선택) 꿈 전체 공통 화풍. 없으면 기본 화풍
-    confidence_style: str      (선택) E1이 정한 확신도 스타일 문구
+
+확신도는 받지 않는다. 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현한다 (E1 합의).
+- 스토리보드는 원본을 보여 주고 블러는 렌더링 단계에서만 적용 (C 계획서)
+- 생성 단계에서 흐리게 만들면 E1 블러와 겹치고, 원본(no_blur) vs 블러(blur) 비교가 어려워짐
+payload에 confidence_style이 들어와도 무시하고 경고만 남긴다.
 
 결과 (장면 버전에 기록할 값):
     image_path, final_prompt, model, settings, seed, attempts, elapsed_seconds, generated_at
@@ -139,12 +143,11 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
     if target.exists():
         raise JobError(FailureCode.INVALID_INPUT, f"이미 있는 장면 버전입니다: v{version_no} (원본은 덮어쓰지 않음)")
 
-    final_prompt = build_prompt(
-        scene_prompt,
-        characters=characters,
-        style=payload.get("style_prompt"),
-        confidence_style=payload.get("confidence_style"),
-    )
+    if payload.get("confidence_style"):
+        ctx.logger.warning("confidence_style은 무시합니다. 확신도는 E1 블러로만 표현합니다 (scene=%s)", scene_id)
+
+    # confidence_style을 넘기지 않으므로 항상 선명한 원본
+    final_prompt = build_prompt(scene_prompt, characters=characters, style=payload.get("style_prompt"))
 
     ctx.report_stage(JobStage.REQUESTING)
     ctx.logger.info("이미지 생성 요청 scene=%s v%s model=%s", scene_id, version_no, img_cfg.openai_image_model)

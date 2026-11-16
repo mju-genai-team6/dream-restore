@@ -13,7 +13,7 @@
 | 파일 | 내용 |
 | --- | --- |
 | `generate.py` | `handle_generate_image` (`@register(JobType.GENERATE_IMAGE)`), 장면 1개 = 작업 1개 |
-| `prompt.py` | 프롬프트 조합: 공통 화풍 → 장면 내용 → 인물 외형 → 확신도 스타일 |
+| `prompt.py` | 프롬프트 조합: 공통 화풍 → 장면 내용 → 인물 외형 (→ 확신도 스타일: 실험·E1 테스트용, 파이프라인에서는 쓰지 않음) |
 | `config.py` | 이미지 생성 설정 (공용 `app/core/config.py`와 같은 `.env`를 읽음) |
 
 ### payload (C가 Job API에서 넣어 줄 값)
@@ -24,12 +24,14 @@
   "version_no": 1,
   "image_prompt_en": "A long dark school hallway ...",
   "characters": [{"name": "grandma", "appearance": "white hair, pink cardigan, 70s"}],
-  "style_prompt": null,
-  "confidence_style": null
+  "style_prompt": null
 }
 ```
 
-`characters`, `style_prompt`, `confidence_style`는 선택입니다. D 출력에 등장 인물·확신도가 확정되면 C가 채워 줍니다.
+`characters`, `style_prompt`는 선택입니다. D 출력에 등장 인물이 확정되면 C가 채워 줍니다.
+
+**확신도는 넣지 않습니다.** 이미지는 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현합니다 (E1 합의).
+스토리보드는 원본을, 영상은 블러를 적용한 이미지를 씁니다. payload에 `confidence_style`이 들어와도 무시하고 경고 로그만 남깁니다.
 
 ### 반환값 (장면 버전에 기록)
 
