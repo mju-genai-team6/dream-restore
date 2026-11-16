@@ -282,3 +282,9 @@ docker compose exec -T db pg_dump -U dream -d dream --format=custom > backup_202
 # 복원 (기존 데이터를 지우고 백업 시점으로)
 docker compose exec -T db pg_restore -U dream -d dream --clean --if-exists < backup_20261128.dump
 ```
+
+- 위 명령은 **Git Bash**에서 실행합니다. Windows PowerShell 5의 `>`·`<`는 바이너리 파일을 깨뜨립니다.
+- 셸과 상관없이 하려면 컨테이너 안에 파일로 만든 뒤 꺼냅니다.
+  `docker compose exec db pg_dump -U dream -d dream --format=custom -f /tmp/backup.dump` →
+  `docker compose cp db:/tmp/backup.dump backup_20261128.dump`
+- 11/16에 빈 DB로 복원해 꿈·장면 버전·작업 수, 마이그레이션 버전, 뷰 4개, 트리거 2개가 원본과 같은지 확인했습니다.
