@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
 from app.core.config import settings
-from app.core.errors import AudioTooLarge, _body, register_error_handlers
+from app.core.errors import AudioTooLarge, error_body, register_error_handlers
 
 app = FastAPI(title="Dream Restore API", version="0.1.0")
 
@@ -25,7 +25,7 @@ async def reject_large_audio(request: Request, call_next):
         if length.isdigit() and int(length) > limit:
             return JSONResponse(
                 status_code=AudioTooLarge.status_code,
-                content=_body(
+                content=error_body(
                     AudioTooLarge.code,
                     f"음성 파일은 {settings.audio_max_mb}MB까지 올릴 수 있습니다.",
                     {"max_mb": settings.audio_max_mb},
