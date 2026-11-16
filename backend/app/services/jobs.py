@@ -4,15 +4,14 @@ from sqlalchemy.orm import Session
 
 from app.core.enums import DreamStatus, ExtractionPhase, JobType
 from app.core.errors import InvalidState, NotFound
-from app.jobs import runner
+from app.jobs.submit import submit_job
 from app.repositories import extractions as extraction_repo
 from app.repositories import jobs as job_repo
 from app.schemas.jobs import JobCreate, JobSummary
-from app.services.events import publish_job_event
 from app.services.interview import require_dream
 from app.services.job_views import job_summary
 from app.services.llm_calls import dream_lock
-from app.services.transactions import commit, expire_loaded, rollback
+from app.services.transactions import expire_loaded
 
 
 def _ensure_scenes_requestable(db: Session, dream_id: int) -> None:
@@ -41,18 +40,14 @@ def create_job(
         # 잠금을 기다리는 동안 다른 요청이 상태를 바꿨을 수 있어 DB에서 다시 읽는다
         expire_loaded(db)
         _ensure_scenes_requestable(db, dream_id)
-        active = {job.id for job in job_repo.get_active_jobs(db, dream_id)}
-        try:
-            job = job_repo.create_job_or_get_active(db, dream_id, JobType(body.type))
-            commit(db)
-        except Exception:
-            rollback(db)
-            raise
-    summary = job_summary(job)
-    if job.id not in active:
-        publish_job_event(summary)
-        runner.schedule(background_tasks, job.id)
-    return summary
+        job, _created = submit_job(
+            db,
+            background_tasks,
+            dream_id=dream_id,
+            job_type=JobType(body.type),
+            target_id=None,
+        )
+    return job_summary(job)
 
 
 def get_job(db: Session, job_id: int) -> JobSummary:

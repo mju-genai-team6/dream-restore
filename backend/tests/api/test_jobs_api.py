@@ -6,14 +6,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.enums import FailureCode, JobStatus, JobType
-from app.jobs import runner
+from app.jobs import runner, submit
 from app.jobs.context import JobError
 from app.jobs.registry import HANDLERS
 from app.llm import client as llm_client
 from app.main import app
 from app.repositories import jobs as job_repo
 from app.schemas.jobs import JobSummary
-from app.services import jobs as job_service
 from app.services.repo_bridge import QUEUED_INTERRUPTED_MESSAGE
 from tests.api import rows
 from tests.llm_fakes import FakeLlm
@@ -37,7 +36,7 @@ def llm(monkeypatch) -> FakeLlm:
 def events(monkeypatch) -> list[JobSummary]:
     """작업 등록(queued)과 실행기의 상태·단계 변경 이벤트를 모은다."""
     sent: list[JobSummary] = []
-    monkeypatch.setattr(job_service, "publish_job_event", sent.append)
+    monkeypatch.setattr(submit, "publish_job_event", sent.append)
     monkeypatch.setattr(runner, "publish_job_event", sent.append)
     return sent
 

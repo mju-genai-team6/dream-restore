@@ -18,6 +18,18 @@
 | `generate_narration` (선택) | TTS | `worker/render/` |
 | `revise_scene` (선택) | 장면 수정 | `app/llm/`, `worker/image_gen/` |
 
+### target_id
+
+작업 종류마다 `jobs.target_id`가 가리키는 대상이 다릅니다. 외래키는 없고 id만 저장합니다 (`docs/rules/data-model.md`).
+
+| 작업 종류 | target_id |
+| --- | --- |
+| `generate_scenes` | NULL |
+| `generate_image` | `scene_version_id` (`scene_versions.id`) |
+| `render_video` | `render_id` (`renders.id`) |
+| `generate_narration` (선택) | `scenes.id` |
+| `revise_scene` (선택) | `scenes.id` |
+
 - 실행 상태: `queued`, `running`, `succeeded`, `failed`
 - 실패 사유: `TIMEOUT`, `CONTENT_POLICY`, `PROVIDER_ERROR`, `INVALID_INPUT`, `LLM_SCHEMA`, `RENDER_FAILED`, `INTERRUPTED`
 - `JobError`가 아닌 예외로 실패한 작업은 DB에 `error_code`를 NULL로 두고, API에서는 `error.code = "INTERNAL_ERROR"`로 보여 준다 (`FailureCode` 값이 아님)

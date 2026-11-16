@@ -1,9 +1,13 @@
 """작업 실행기.
 
 - 작업 상태는 jobs 테이블에 저장한다. 요청 세션은 응답 뒤 닫히므로 작업마다 새 세션을 연다.
-- 같은 꿈에 같은 종류의 작업이 진행 중이면 기존 jobId 반환 (services/jobs.py, create_job_or_get_active)
+- 같은 꿈에 같은 종류의 작업이 진행 중이면 기존 jobId 반환 (jobs/submit.py, create_job_or_get_active)
 - JobError(retryable=True)는 settings.job_max_retries회까지 자동 재시도. CONTENT_POLICY는 바로 실패
 - JobError가 아닌 예외는 재시도 없이 실패. error_code는 NULL(API에서 INTERNAL_ERROR)
+- 성공 후처리(on_success)와 succeeded는 같은 세션에서 한 번에 commit한다. 후처리가 실패하면 핸들러는 다시 실행하지 않는다
+- on_failure는 최종 실패와 서버 시작 시 INTERRUPTED에서만 호출한다. 재시도 중간에는 호출하지 않는다
+- 실패 후처리가 예외를 내도 실행기는 멈추지 않는다. 작업은 그 전에 failed로 commit되어 있다
+- SSE(publish_job_event)는 commit 뒤에 보낸다
 - 서버 재시작 시 running·queued 작업은 INTERRUPTED로 실패 처리 (recover_interrupted)
 - 이미지 생성 동시 요청 수는 settings.image_max_concurrency로 제한 (C-S3-02)
 """
@@ -23,7 +27,7 @@ from app.core.config import settings
 from app.core.enums import FailureCode, JobStage, JobStatus
 from app.db.session import SessionLocal
 from app.jobs.context import JobError
-from app.jobs.registry import get_handler
+from app.jobs.registry import get_handler, get_on_failure, get_on_success
 from app.models import Job
 from app.repositories import jobs as job_repo
 from app.services import repo_bridge
@@ -99,10 +103,59 @@ def run_job(job_id: int, payload: dict) -> None:
 
 def _fail_after_runner_error(db: Session, job_id: int) -> None:
     try:
-        _save(db, job_id, status=JobStatus.FAILED, error_code=None, error_message=INTERNAL_ERROR_MESSAGE)
+        _fail(db, job_id, None, INTERNAL_ERROR_MESSAGE)
     except Exception:
         logger.exception("작업 %s 실패 기록 실패", job_id)
         rollback(db)
+
+
+def _call_on_failure(db: Session, job: Job) -> None:
+    """실패가 commit된 뒤에 부른다. 후처리 예외는 로그로 남기고 실행을 계속한다."""
+    hook = get_on_failure(job.type)
+    if hook is None:
+        return
+    try:
+        hook(db, job, job.error_code, job.error_message or "")
+        commit(db)
+    except Exception:
+        logger.exception("작업 %s 실패 후처리 오류", job.id)
+        rollback(db)
+
+
+def _fail(
+    db: Session,
+    job_id: int,
+    error_code: FailureCode | str | None,
+    error_message: str,
+) -> None:
+    """미반영 변경을 되돌리고 failed로 commit한 뒤, 실패 후처리와 SSE를 순서대로 한다."""
+    rollback(db)
+    job = job_repo.update_job(
+        db, job_id, status=JobStatus.FAILED, error_code=error_code, error_message=error_message
+    )
+    if job is None:
+        raise RuntimeError(f"작업 {job_id}이 없습니다.")
+    commit(db)
+    _call_on_failure(db, job)
+    job = job_repo.get_job(db, job_id)
+    if job is None:
+        raise RuntimeError(f"작업 {job_id}이 없습니다.")
+    publish_job_event(job_summary(job))
+
+
+def _complete(db: Session, job_id: int, result: dict) -> None:
+    """성공 후처리와 succeeded를 한 트랜잭션으로 commit한 뒤 SSE를 보낸다."""
+    job = job_repo.get_job(db, job_id)
+    if job is None:
+        raise RuntimeError(f"작업 {job_id}이 없습니다.")
+    hook = get_on_success(job.type)
+    if hook is not None:
+        hook(db, job, result)
+    job = job_repo.update_job(db, job_id, status=JobStatus.SUCCEEDED)
+    if job is None:
+        raise RuntimeError(f"작업 {job_id}이 없습니다.")
+    commit(db)
+    publish_job_event(job_summary(job))
 
 
 def _run(db: Session, job_id: int, payload: dict) -> None:
@@ -113,7 +166,7 @@ def _run(db: Session, job_id: int, payload: dict) -> None:
     handler = get_handler(job.type)
     if handler is None:
         logger.error("작업 %s: 등록된 처리 함수가 없습니다 (%s)", job_id, job.type)
-        _save(db, job_id, status=JobStatus.FAILED, error_code=None, error_message=INTERNAL_ERROR_MESSAGE)
+        _fail(db, job_id, None, INTERNAL_ERROR_MESSAGE)
         return
 
     ctx = RunnerContext(db, job)
@@ -123,7 +176,7 @@ def _run(db: Session, job_id: int, payload: dict) -> None:
         attempt += 1
         _save(db, job_id, status=JobStatus.RUNNING, stage=None, attempt=attempt)
         try:
-            handler(ctx, payload)
+            result = handler(ctx, payload)
         except JobError as exc:
             rollback(db)
             retry = exc.retryable and exc.code != FailureCode.CONTENT_POLICY and attempt < max_attempts
@@ -134,26 +187,44 @@ def _run(db: Session, job_id: int, payload: dict) -> None:
                 time.sleep(settings.job_retry_delay_seconds)
                 continue
             ctx.logger.warning("작업 %s 실패 %s (시도 %s회): %s", job_id, exc.code, attempt, exc.message)
-            _save(db, job_id, status=JobStatus.FAILED, error_code=exc.code, error_message=exc.message)
+            _fail(db, job_id, exc.code, exc.message)
             return
         except Exception:
             ctx.logger.exception("작업 %s 처리 중 예외 (시도 %s회)", job_id, attempt)
-            rollback(db)
-            _save(db, job_id, status=JobStatus.FAILED, error_code=None, error_message=INTERNAL_ERROR_MESSAGE)
+            _fail(db, job_id, None, INTERNAL_ERROR_MESSAGE)
             return
-        _save(db, job_id, status=JobStatus.SUCCEEDED)
+        if result is None:
+            result = {}
+        try:
+            _complete(db, job_id, result)
+        except JobError as exc:
+            # 렌더·이미지 비용이 든 핸들러는 다시 실행하지 않는다. retryable이어도 최종 실패다.
+            ctx.logger.warning("작업 %s 성공 후처리 실패 %s: %s", job_id, exc.code, exc.message)
+            _fail(db, job_id, exc.code, exc.message)
+        except Exception:
+            ctx.logger.exception("작업 %s 성공 후처리 중 예외", job_id)
+            _fail(db, job_id, None, INTERNAL_ERROR_MESSAGE)
         return
 
 
 def recover_interrupted() -> int:
-    """서버 시작 시 호출. 재시작으로 사라진 running·queued 작업을 INTERRUPTED로 실패 처리한다."""
+    """서버 시작 시 호출. 재시작으로 사라진 running·queued 작업을 INTERRUPTED로 실패 처리한다.
+
+    두 mark 함수는 바꾼 개수만 돌려주므로, UPDATE 전에 대상 id를 조회한 뒤 실패 후처리를 부른다.
+    """
     with session_factory() as db:
+        pending_ids = repo_bridge.list_active_job_ids(db)
         try:
             count = job_repo.mark_interrupted(db) + repo_bridge.mark_queued_interrupted(db)
             commit(db)
         except Exception:
             rollback(db)
             raise
+        for job_id in pending_ids:
+            job = job_repo.get_job(db, job_id)
+            if job is None:
+                continue
+            _call_on_failure(db, job)
     if count:
         logger.warning("중단된 작업 %s개를 INTERRUPTED로 처리했습니다.", count)
     return count
