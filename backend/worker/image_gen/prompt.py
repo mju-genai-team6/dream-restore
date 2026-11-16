@@ -18,12 +18,30 @@ DEFAULT_STYLE = "dreamlike, soft lighting, gentle painterly texture"
 COMPOSITION = "wide landscape composition, main subject near the center"
 
 
+# 세계관 인물(world_entities)의 외형 항목. B2 인물 등록 화면과 같은 항목이고, 이 순서로 문구를 만든다
+WORLD_ENTITY_FIELDS = ("age_range", "hair", "outfit", "features")
+
+
 @dataclass(frozen=True)
 class Character:
     """장면에 나오는 인물. appearance는 머리 모양, 머리색, 옷차림, 나이대, 구별되는 특징."""
 
     name: str
     appearance: str
+
+    @classmethod
+    def from_world_entity(cls, name: str, extra: str | None = None, **fields: str | None) -> Character:
+        """등록된 세계관 인물(world_entities 행)로 만든다. 다른 날의 꿈에도 같은 외형 문구가 들어간다.
+
+        fields: age_range, hair, outfit, features (비어 있는 항목은 건너뜀)
+        extra:  이번 꿈에서만 다른 점 (예: "wearing a raincoat today"). 등록 외형 뒤에 붙는다
+        """
+        unknown = set(fields) - set(WORLD_ENTITY_FIELDS)
+        if unknown:
+            raise ValueError(f"알 수 없는 외형 항목: {sorted(unknown)}")
+        parts = [_clean(fields.get(key)) for key in WORLD_ENTITY_FIELDS]
+        parts.append(_clean(extra))
+        return cls(name=name, appearance=", ".join(p for p in parts if p))
 
 
 def _clean(text: str | None) -> str:

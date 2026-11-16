@@ -5,6 +5,12 @@
   - 출력 규격(초안): 1280×720, 30fps, MP4
   - 저장 경로: `render_video`, 임시 파일은 `job_tmp`
 - TTS(선택): `generate_narration` 작업 함수, 저장 경로 `scene_narration`
+  - 구현: `narration.py` (`@register(JobType.GENERATE_NARRATION)`)
+  - payload: `{"scene_id", "version_no", "text", "voice"(선택)}` — text는 최대 200자
+  - 결과: `narration_path`, `duration_seconds`(mutagen으로 측정), `text`, `model`, `voice`, `speed`, `attempts`, `generated_at`
+  - 이미지와 같은 버전 폴더(`v{n}/narration.mp3`)에 저장, 기존 파일은 덮어쓰지 않음
+  - 기본값: `gpt-4o-mini-tts`, 음성 `sage`, 속도 0.95 — `.env`의 `TTS_MODEL`, `TTS_VOICE`, `TTS_SPEED`로 변경
+  - 시간 초과·일시적 오류는 최대 2회 재시도. 테스트: `pytest tests/test_narration.py`
 
 ## 구현 모듈 (E1 렌더링)
 
