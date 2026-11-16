@@ -15,3 +15,6 @@
   - 수동 재시도 시 `reuse_existing=True`로 기존에 검증된 후처리 이미지를 재사용할 수 있습니다.
 - `postprocess_scene_for_storage(storage_root, dream_id, scene_id, version_no, confidence_level, settings=None, *, reuse_existing=True) -> PostprocessResult`
   - `app.storage.paths` 규칙에 맞춰 상대 경로 기준 후처리를 수행합니다.
+- `confidence_style_for(confidence_level) -> str`
+  - E2(`worker/image_gen/prompt.py`)의 `confidence_style` 인자에 넣을 확신도별 영어 스타일 문구를 반환합니다.
+  - 단, 스토리보드는 원본 이미지를 보여주고 영상 렌더링 단계에서 블러를 적용하는 규칙과 충돌하지 않도록, 이미지 생성 시 이 문구를 사용할지 여부는 E2·C와 협의해 결정합니다.
