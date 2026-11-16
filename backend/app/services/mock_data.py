@@ -180,17 +180,27 @@ ELEMENTS = {
     ]
 }
 
-JOB_CREATED = {"job_id": SCENES_JOB_ID, "status": "queued"}
-
-JOB = {
+JOB_QUEUED = {
     "job_id": SCENES_JOB_ID,
     "dream_id": DREAM_ID,
     "type": "generate_scenes",
-    "status": "succeeded",
-    "stage": "prompting",
+    "target_id": None,
+    "status": "queued",
+    "stage": None,
+    "attempt": 0,
     "error": None,
     "created_at": CREATED_AT,
-    "updated_at": UPDATED_AT,
+    "started_at": None,
+    "finished_at": None,
+}
+
+JOB = {
+    **JOB_QUEUED,
+    "status": "succeeded",
+    "stage": "prompting",
+    "attempt": 1,
+    "started_at": CREATED_AT,
+    "finished_at": UPDATED_AT,
 }
 
 JOB_FAILED_EXAMPLE = {

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     image_max_concurrency: int = 3
     job_timeout_seconds: int = 300
+    job_max_retries: int = 2  # JobError(retryable=True)일 때 자동 재시도 횟수
+    job_retry_delay_seconds: float = 2.0
     audio_max_mb: int = 25
 
     @property

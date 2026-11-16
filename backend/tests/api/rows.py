@@ -2,7 +2,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AudioFile, DreamElement, Extraction, InterviewQuestion
+from app.models import AudioFile, DreamElement, Extraction, InterviewQuestion, Job
 
 
 def audio_files(db: Session) -> list[AudioFile]:
@@ -21,3 +21,7 @@ def elements_of(db: Session, extraction_id: int) -> list[DreamElement]:
 
 def questions(db: Session) -> list[InterviewQuestion]:
     return list(db.scalars(select(InterviewQuestion).order_by(InterviewQuestion.id)))
+
+
+def jobs(db: Session) -> list[Job]:
+    return list(db.scalars(select(Job).order_by(Job.id)))

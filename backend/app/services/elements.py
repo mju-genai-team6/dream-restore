@@ -1,7 +1,7 @@
 """요소 목록·확신도 저장. 인터뷰가 끝난 뒤 첫 요소 목록 조회 때 재추출한다."""
 from sqlalchemy.orm import Session
 
-from app.core.enums import DreamStatus, ExtractionPhase
+from app.core.enums import DreamStatus, ExtractionPhase, JobType
 from app.core.errors import InvalidState, ValidationFailed
 from app.llm.interview import reextract
 from app.llm.schemas import InterviewAnswer
@@ -14,7 +14,7 @@ from app.schemas.elements import ConfidenceUpdate, ElementItem, ElementListRespo
 from app.services import repo_bridge
 from app.services.interview import confirmed_text, require_dream
 from app.services.llm_calls import call_llm, dream_lock
-from app.services.transactions import commit, rollback
+from app.services.transactions import commit, expire_loaded, rollback
 
 
 def _is_after_interview(extraction: Extraction | None) -> bool:
@@ -76,13 +76,32 @@ def list_elements(db: Session, dream_id: int) -> ElementListResponse:
 
 
 def set_confidences(db: Session, dream_id: int, body: ConfidenceUpdate) -> ElementListResponse:
-    """요청에 담긴 요소만 저장한다(일부 저장 허용). 빈 확신도 검사는 장면 생성 요청에서 한다."""
+    """요청에 담긴 요소만 저장한다(일부 저장 허용). 빈 확신도 검사는 장면 생성 요청에서 한다.
+
+    장면 생성 요청과 같은 꿈별 잠금 안에서 검사·저장해, 작업 등록과 엇갈려 저장되지 않게 한다.
+    """
+    with dream_lock(dream_id):
+        expire_loaded(db)
+        return _set_confidences(db, dream_id, body)
+
+
+def _set_confidences(db: Session, dream_id: int, body: ConfidenceUpdate) -> ElementListResponse:
     dream = require_dream(db, dream_id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING:
         raise InvalidState("현재 단계에서는 확신도를 저장할 수 없습니다.", {"status": dream.status})
     if not _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
         raise InvalidState("요소 목록을 먼저 확인해 주세요.", {"status": dream.status})
-    # TODO(C-S2-04): 이 꿈에 generate_scenes 작업이 있으면 409 INVALID_STATE
+    # failed 작업은 막지 않는다. 확신도를 고친 뒤 다시 요청할 수 있다
+    # TODO(C-S3-01): 가짜 작업 성공 후에도 막히는지 확인 (scenes_ready로 바뀌면 위 상태 검사로 막힘)
+    scenes_job = next(
+        (job for job in repo_bridge.get_active_jobs(db, dream_id) if job.type == JobType.GENERATE_SCENES),
+        None,
+    )
+    if scenes_job is not None:
+        raise InvalidState(
+            "장면을 만드는 중에는 확신도를 바꿀 수 없습니다.",
+            {"status": dream.status, "job_id": scenes_job.id},
+        )
 
     requested = [item.element_id for item in body.items]
     duplicated = sorted({element_id for element_id in requested if requested.count(element_id) > 1})

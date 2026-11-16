@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.enums import DreamStatus, InputType
+from app.core.enums import DreamStatus, InputType, JobType
 from app.core.errors import (
     AudioTooLarge,
     InvalidState,
@@ -32,6 +32,7 @@ from app.schemas.dreams import (
 )
 from app.schemas.renders import RenderSummary
 from app.services import mock_data, repo_bridge
+from app.services.job_views import job_summary
 from app.services.llm_calls import STT_FAILED_MESSAGE, call_stt, dream_lock
 from app.services.transactions import commit, expire_loaded, rollback
 from app.storage import paths
@@ -42,6 +43,7 @@ _M4A_MIMES = frozenset({"audio/x-m4a", "audio/m4a"})
 _WEBM_MAGIC = b"\x1a\x45\xdf\xa3"
 _MP4_MAGIC = b"ftyp"  # 4번째 바이트부터
 _MAGIC_BYTES = 8
+_DREAM_JOB_TYPES = frozenset({JobType.GENERATE_SCENES, JobType.RENDER_VIDEO})
 
 
 def ensure_sample_dream(dream_id: int) -> None:
@@ -86,7 +88,11 @@ def get_dream(db: Session, dream_id: int) -> DreamResponse:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
     answered, total = interview_repo.get_progress(db, dream_id)
     # active_job은 generate_scenes·render_video 중 진행 중인 하나만 담는다.
-    # 조회 함수가 생기기 전까지 null. generate_image 진행은 장면 목록과 SSE에서 보여 준다.
+    # generate_image 진행은 장면 목록과 SSE에서 보여 준다.
+    active_job = next(
+        (job for job in repo_bridge.get_active_jobs(db, dream_id) if job.type in _DREAM_JOB_TYPES),
+        None,
+    )
     return DreamResponse(
         dream_id=dream.id,
         status=DreamStatus(dream.status),
@@ -94,7 +100,7 @@ def get_dream(db: Session, dream_id: int) -> DreamResponse:
         raw_text=dream.raw_text,
         confirmed_text=dream.confirmed_text,
         interview_progress=InterviewProgress(answered=answered, total=total),
-        active_job=None,
+        active_job=None if active_job is None else job_summary(active_job),
         latest_render=_latest_render(render_repo.get_latest_render(db, dream_id)),
         created_at=dream.created_at,
     )
