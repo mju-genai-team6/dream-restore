@@ -1,4 +1,5 @@
 """질문 조회·답변 저장. 첫 조회 때 질문을 만들고, 이후에는 저장된 질문을 돌려준다."""
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.enums import DreamStatus, ExtractionPhase
@@ -6,21 +7,22 @@ from app.core.errors import InvalidState, NotFound
 from app.llm.interview import extract_and_ask
 from app.models.dream import Dream
 from app.models.interview import InterviewQuestion
+from app.repositories import dreams as dream_repo
+from app.repositories import extractions as extraction_repo
+from app.repositories import interview as interview_repo
 from app.schemas.interview import (
     AnswerCreate,
     AnswerResponse,
     InterviewQuestionItem,
     InterviewResponse,
 )
+from app.services import repo_bridge
 from app.services.llm_calls import call_llm, dream_lock
 from app.services.state_machine import ensure_transition
-from app.services.stubs import dreams as dream_repo
-from app.services.stubs import elements as element_repo
-from app.services.stubs import interview as interview_repo
 from app.services.transactions import commit, rollback
 
 
-def require_dream(db: Session | None, dream_id: int) -> Dream:
+def require_dream(db: Session, dream_id: int) -> Dream:
     dream = dream_repo.get_dream(db, dream_id)
     if dream is None:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
@@ -55,7 +57,7 @@ def _interview_response(rows: list[InterviewQuestion]) -> InterviewResponse:
     )
 
 
-def get_interview(db: Session | None, dream_id: int) -> InterviewResponse:
+def get_interview(db: Session, dream_id: int) -> InterviewResponse:
     dream = require_dream(db, dream_id)
     rows = interview_repo.list_questions(db, dream_id)
     if rows:
@@ -70,33 +72,31 @@ def get_interview(db: Session | None, dream_id: int) -> InterviewResponse:
         result = call_llm(
             extract_and_ask, text, failed_message="질문을 만들지 못했습니다. 다시 시도해 주세요."
         )
-        # TODO(C-S2-06): 실제 DB에서 (dream_id, order) 중복 저장 충돌이 나면 rollback 후 저장된 질문을 다시 읽어 돌려준다
         try:
-            element_repo.save_extraction(
-                db,
-                dream_id=dream_id,
-                phase=ExtractionPhase.RAW.value,
-                payload=result.model_dump(mode="json"),
-                elements=[element.model_dump(mode="json") for element in result.elements],
-                text_length=len(text),
+            extraction_repo.save_extraction(
+                db, dream_id, ExtractionPhase.RAW, result.model_dump(mode="json"), len(text)
             )
             rows = interview_repo.save_questions(
-                db,
-                dream_id,
-                [
-                    {"order": q.order, "text": q.question, "target_element": q.target_element}
-                    for q in result.questions
-                ],
+                db, dream_id, [q.model_dump(mode="json") for q in result.questions]
             )
-            dream_repo.transition_status(db, dream_id, DreamStatus.INTERVIEWING.value)
+            if not dream_repo.transition_status(db, dream_id, dream.status, DreamStatus.INTERVIEWING):
+                rollback(db)
+                raise InvalidState("현재 단계에서는 할 수 없는 요청입니다.", {"status": dream.status})
             commit(db)
+        except IntegrityError:
+            # 잠금은 서버 프로세스 하나 안에서만 유효하다. 다른 프로세스가 먼저 저장했으면
+            # (dream_id, order) 유니크 제약에 걸리므로 그 질문을 돌려준다
+            rollback(db)
+            rows = interview_repo.list_questions(db, dream_id)
+            if not rows:
+                raise
         except Exception:
             rollback(db)
             raise
     return _interview_response(rows)
 
 
-def save_answer(db: Session | None, dream_id: int, body: AnswerCreate) -> AnswerResponse:
+def save_answer(db: Session, dream_id: int, body: AnswerCreate) -> AnswerResponse:
     """답변 저장만 한다. 재추출은 요소 목록 조회(GET /elements) 때 한다."""
     dream = require_dream(db, dream_id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING:
@@ -107,17 +107,14 @@ def save_answer(db: Session | None, dream_id: int, body: AnswerCreate) -> Answer
 
     # 재추출이 진행 중이면 끝날 때까지 기다린 뒤 아래 검사로 막는다
     with dream_lock(dream_id):
-        latest = element_repo.get_latest_extraction(db, dream_id)
+        latest = repo_bridge.get_latest_extraction(db, dream_id)
         if latest is not None and latest.phase == ExtractionPhase.AFTER_INTERVIEW.value:
             raise InvalidState(
                 "답변을 반영한 요소 정리가 끝나 답변을 바꿀 수 없습니다.", {"status": dream.status}
             )
         try:
             interview_repo.save_answer(
-                db,
-                body.question_id,
-                answer=None if body.skipped else body.answer,
-                skipped=body.skipped,
+                db, dream_id, body.question_id, answer=body.answer, skipped=body.skipped
             )
             commit(db)
         except Exception:

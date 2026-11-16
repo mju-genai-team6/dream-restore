@@ -7,11 +7,13 @@ from app.llm.interview import reextract
 from app.llm.schemas import InterviewAnswer
 from app.models.dream import Dream
 from app.models.interview import DreamElement, Extraction
+from app.repositories import InvalidData
+from app.repositories import extractions as extraction_repo
+from app.repositories import interview as interview_repo
 from app.schemas.elements import ConfidenceUpdate, ElementItem, ElementListResponse
+from app.services import repo_bridge
 from app.services.interview import confirmed_text, require_dream
 from app.services.llm_calls import call_llm, dream_lock
-from app.services.stubs import elements as element_repo
-from app.services.stubs import interview as interview_repo
 from app.services.transactions import commit, rollback
 
 
@@ -34,7 +36,7 @@ def _element_response(rows: list[DreamElement]) -> ElementListResponse:
     )
 
 
-def _ensure_interview_done(db: Session | None, dream: Dream) -> None:
+def _ensure_interview_done(db: Session, dream: Dream) -> None:
     answered, total = interview_repo.get_progress(db, dream.id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING or total == 0 or answered < total:
         raise InvalidState(
@@ -43,16 +45,16 @@ def _ensure_interview_done(db: Session | None, dream: Dream) -> None:
         )
 
 
-def list_elements(db: Session | None, dream_id: int) -> ElementListResponse:
+def list_elements(db: Session, dream_id: int) -> ElementListResponse:
     dream = require_dream(db, dream_id)
-    if _is_after_interview(element_repo.get_latest_extraction(db, dream_id)):
-        return _element_response(element_repo.list_elements(db, dream_id))
+    if _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
+        return _element_response(extraction_repo.list_elements(db, dream_id))
 
     _ensure_interview_done(db, dream)
     text = confirmed_text(dream)
     with dream_lock(dream_id):
-        if _is_after_interview(element_repo.get_latest_extraction(db, dream_id)):
-            return _element_response(element_repo.list_elements(db, dream_id))
+        if _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
+            return _element_response(extraction_repo.list_elements(db, dream_id))
         answers = [
             InterviewAnswer(question=row.text, answer=None if row.skipped else row.answer)
             for row in interview_repo.list_questions(db, dream_id)
@@ -60,29 +62,25 @@ def list_elements(db: Session | None, dream_id: int) -> ElementListResponse:
         result = call_llm(
             reextract, text, answers, failed_message="요소를 정리하지 못했습니다. 다시 시도해 주세요."
         )
-        # TODO(C-S2-06): 실제 DB에서 중복 저장 충돌이 나면 rollback 후 저장된 최신 추출의 요소를 다시 읽어 돌려준다
+        # extractions에는 유니크 제약이 없어 중복 재추출은 이 잠금으로만 막는다(서버 프로세스 하나 기준).
+        # 다른 프로세스와 겹쳐 두 번 저장돼도 요소 목록은 가장 최근 추출만 보여 준다
         try:
-            element_repo.save_extraction(
-                db,
-                dream_id=dream_id,
-                phase=ExtractionPhase.AFTER_INTERVIEW.value,
-                payload=result.model_dump(mode="json"),
-                elements=[element.model_dump(mode="json") for element in result.elements],
-                text_length=len(text),
+            extraction_repo.save_extraction(
+                db, dream_id, ExtractionPhase.AFTER_INTERVIEW, result.model_dump(mode="json"), len(text)
             )
             commit(db)
         except Exception:
             rollback(db)
             raise
-    return _element_response(element_repo.list_elements(db, dream_id))
+    return _element_response(extraction_repo.list_elements(db, dream_id))
 
 
-def set_confidences(db: Session | None, dream_id: int, body: ConfidenceUpdate) -> ElementListResponse:
+def set_confidences(db: Session, dream_id: int, body: ConfidenceUpdate) -> ElementListResponse:
     """요청에 담긴 요소만 저장한다(일부 저장 허용). 빈 확신도 검사는 장면 생성 요청에서 한다."""
     dream = require_dream(db, dream_id)
     if DreamStatus(dream.status) != DreamStatus.INTERVIEWING:
         raise InvalidState("현재 단계에서는 확신도를 저장할 수 없습니다.", {"status": dream.status})
-    if not _is_after_interview(element_repo.get_latest_extraction(db, dream_id)):
+    if not _is_after_interview(repo_bridge.get_latest_extraction(db, dream_id)):
         raise InvalidState("요소 목록을 먼저 확인해 주세요.", {"status": dream.status})
     # TODO(C-S2-04): 이 꿈에 generate_scenes 작업이 있으면 409 INVALID_STATE
 
@@ -90,17 +88,21 @@ def set_confidences(db: Session | None, dream_id: int, body: ConfidenceUpdate) -
     duplicated = sorted({element_id for element_id in requested if requested.count(element_id) > 1})
     if duplicated:
         raise ValidationFailed("같은 요소가 여러 번 들어 있습니다.", {"element_ids": duplicated})
-    current_ids = {row.id for row in element_repo.list_elements(db, dream_id)}
+    current_ids = {row.id for row in extraction_repo.list_elements(db, dream_id)}
     unknown = sorted(set(requested) - current_ids)
     if unknown:
         raise ValidationFailed("요소 목록에 없는 요소입니다.", {"element_ids": unknown})
 
     try:
-        rows = element_repo.set_confidences(
+        extraction_repo.set_confidences(
             db, dream_id, {item.element_id: item.confidence.value for item in body.items}
         )
         commit(db)
+    except InvalidData as exc:
+        rollback(db)
+        raise ValidationFailed(exc.message, exc.detail) from exc
     except Exception:
         rollback(db)
         raise
-    return _element_response(rows)
+    # set_confidences는 저장한 요소만 돌려주므로 전체 목록을 다시 읽는다
+    return _element_response(extraction_repo.list_elements(db, dream_id))

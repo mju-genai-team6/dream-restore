@@ -1,4 +1,4 @@
-"""꿈 기록 처리. 생성·조회·원문 확정·음성 저장·STT는 임시 저장소를 쓰고, 목록은 아직 목업이다."""
+"""꿈 기록 처리. 생성·조회·원문 확정·음성 저장·STT는 DB를 쓰고, 목록은 아직 목업이다."""
 from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
@@ -16,7 +16,11 @@ from app.core.errors import (
 )
 from app.llm.interview import transcribe
 from app.models.dream import Dream
-from app.models.scene import Render
+from app.repositories import audio as audio_repo
+from app.repositories import dreams as dream_repo
+from app.repositories import interview as interview_repo
+from app.repositories import renders as render_repo
+from app.repositories.renders import LatestRender
 from app.schemas.dreams import (
     AudioUploadResponse,
     DreamConfirm,
@@ -27,12 +31,9 @@ from app.schemas.dreams import (
     InterviewProgress,
 )
 from app.schemas.renders import RenderSummary
-from app.services import mock_data
+from app.services import mock_data, repo_bridge
 from app.services.llm_calls import STT_FAILED_MESSAGE, call_stt, dream_lock
-from app.services.stubs import dreams as dream_repo
-from app.services.stubs import interview as interview_repo
-from app.services.stubs import renders as render_repo
-from app.services.transactions import commit, rollback
+from app.services.transactions import commit, expire_loaded, rollback
 from app.storage import paths
 
 _AUDIO_CHUNK_BYTES = 64 * 1024
@@ -53,26 +54,25 @@ def _status_response(dream: Dream) -> DreamStatusResponse:
     return DreamStatusResponse(dream_id=dream.id, status=DreamStatus(dream.status))
 
 
-def _latest_render(render: Render | None) -> RenderSummary | None:
-    """영상 경로는 검증이 끝나 video_path가 있을 때만 주소로 바꾼다."""
-    if render is None or render.video_path is None:
+def _latest_render(latest: LatestRender | None) -> RenderSummary | None:
+    """완료된 영상 중 가장 최근 것. 영상 경로는 검증이 끝나 video_path가 있을 때만 주소로 바꾼다."""
+    if latest is None or latest.render.video_path is None:
         return None
-    # TODO(C-S3-04): current_version_id와 scene_version_ids를 비교해 is_latest 계산
     return RenderSummary(
-        render_id=render.id,
-        video_url=paths.public_url(render.video_path),
-        is_latest=True,
+        render_id=latest.render.id,
+        video_url=paths.public_url(latest.render.video_path),
+        is_latest=latest.is_latest,
     )
 
 
-def create_dream(db: Session | None, body: DreamCreate) -> DreamStatusResponse:
+def create_dream(db: Session, body: DreamCreate) -> DreamStatusResponse:
     """텍스트 입력은 확정 원문까지 저장하고, 음성은 원문 확정을 남긴다."""
     try:
         dream = dream_repo.create_dream(
             db, input_type=body.input_type.value, raw_text=body.text
         )
         if body.input_type == InputType.TEXT and body.text is not None:
-            dream = dream_repo.update_confirmed_text(db, dream.id, body.text)
+            dream_repo.update_confirmed_text(db, dream.id, body.text)
         commit(db)
     except Exception:
         rollback(db)
@@ -80,7 +80,7 @@ def create_dream(db: Session | None, body: DreamCreate) -> DreamStatusResponse:
     return _status_response(dream)
 
 
-def get_dream(db: Session | None, dream_id: int) -> DreamResponse:
+def get_dream(db: Session, dream_id: int) -> DreamResponse:
     dream = dream_repo.get_dream(db, dream_id)
     if dream is None:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
@@ -100,7 +100,7 @@ def get_dream(db: Session | None, dream_id: int) -> DreamResponse:
     )
 
 
-def confirm_text(db: Session | None, dream_id: int, body: DreamConfirm) -> DreamStatusResponse:
+def confirm_text(db: Session, dream_id: int, body: DreamConfirm) -> DreamStatusResponse:
     dream = dream_repo.get_dream(db, dream_id)
     if dream is None:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
@@ -110,7 +110,7 @@ def confirm_text(db: Session | None, dream_id: int, body: DreamConfirm) -> Dream
             {"status": dream.status},
         )
     try:
-        dream = dream_repo.update_confirmed_text(db, dream_id, body.confirmed_text)
+        dream_repo.update_confirmed_text(db, dream_id, body.confirmed_text)
         commit(db)
     except Exception:
         rollback(db)
@@ -166,7 +166,7 @@ def _copy_audio(
     return size, audio_format
 
 
-def _require_uploadable(db: Session | None, dream_id: int) -> Dream:
+def _require_uploadable(db: Session, dream_id: int) -> Dream:
     dream = dream_repo.get_dream(db, dream_id)
     if dream is None:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
@@ -178,7 +178,7 @@ def _require_uploadable(db: Session | None, dream_id: int) -> Dream:
 
 
 def upload_audio(
-    db: Session | None,
+    db: Session,
     dream_id: int,
     *,
     filename: str | None,
@@ -213,9 +213,10 @@ def upload_audio(
 
     with dream_lock(dream_id):
         try:
-            # 잠금을 기다리는 동안 인터뷰가 시작됐을 수 있다
+            # 잠금을 기다리는 동안 인터뷰가 시작됐을 수 있어 DB에서 다시 읽는다
+            expire_loaded(db)
             _require_uploadable(db, dream_id)
-            audio = dream_repo.add_audio_file(
+            audio = audio_repo.add_audio_file(
                 db, dream_id=dream_id, path=str(rel_path), mime_type=mime, size=size, duration=None
             )
             dream_repo.update_confirmed_text(db, dream_id, None)
@@ -231,12 +232,12 @@ def upload_audio(
         if not text:
             raise SttFailed(STT_FAILED_MESSAGE)
         try:
-            dream = dream_repo.update_raw_text(db, dream_id, text)
+            repo_bridge.update_raw_text(db, dream_id, text)
             commit(db)
         except Exception:
             rollback(db)
             raise
-    return AudioUploadResponse(audio_id=audio.id, transcript=dream.raw_text)
+    return AudioUploadResponse(audio_id=audio.id, transcript=text)
 
 
 # TODO(C-S3-05): list_dreams 커서 페이지 조회

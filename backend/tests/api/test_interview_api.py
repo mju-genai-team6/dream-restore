@@ -4,22 +4,19 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.enums import ExtractionPhase
+from app.core.enums import DreamStatus, ExtractionPhase
 from app.llm import client as llm_client
 from app.main import app
-from app.services.stubs import store
+from app.repositories import dreams as dream_repo
+from app.repositories import extractions as extraction_repo
+from app.repositories import interview as interview_repo
+from app.services import interview as interview_service
+from tests.api import rows
 from tests.llm_fakes import FakeLlm
 
 client = TestClient(app)
 
 TEXT = {"input_type": "text", "text": "어두운 학교 복도에서 할머니가 노란 우산을 건네줬다."}
-
-
-@pytest.fixture(autouse=True)
-def _clear_store():
-    store.clear()
-    yield
-    store.clear()
 
 
 @pytest.fixture
@@ -56,19 +53,19 @@ def test_first_get_creates_questions_and_refresh_returns_same(llm):
     assert detail["interview_progress"] == {"answered": 0, "total": 6}
 
 
-def test_first_get_saves_raw_extraction_with_null_confidence(llm):
+def test_first_get_saves_raw_extraction_with_null_confidence(llm, read_db):
     dream_id = _text_dream()
     client.get(f"/dreams/{dream_id}/interview")
 
-    [extraction] = store.extractions.values()
+    [extraction] = rows.extractions(read_db)
     assert extraction.phase == ExtractionPhase.RAW.value
     assert extraction.element_count == 5
     assert extraction.text_length == len(TEXT["text"])
     assert len(extraction.payload["questions"]) == 6
-    elements = [e for e in store.elements.values() if e.extraction_id == extraction.id]
+    elements = rows.elements_of(read_db, extraction.id)
     assert len(elements) == 5
     assert all(e.confidence is None for e in elements)
-    assert store.questions[1].text == "복도에서 기억나는 것을 자유롭게 말해 주세요."
+    assert interview_repo.list_questions(read_db, dream_id)[0].text == "복도에서 기억나는 것을 자유롭게 말해 주세요."
 
 
 def test_voice_dream_without_confirmed_text_is_rejected(llm):
@@ -86,7 +83,7 @@ def test_unknown_dream_returns_not_found(llm):
     assert res.status_code == 404
 
 
-def test_answer_and_skip_update_progress(llm):
+def test_answer_and_skip_update_progress(llm, read_db):
     dream_id = _text_dream()
     questions = client.get(f"/dreams/{dream_id}/interview").json()["questions"]
 
@@ -102,7 +99,7 @@ def test_answer_and_skip_update_progress(llm):
         json={"question_id": questions[1]["question_id"], "answer": "무시됨", "skipped": True},
     )
     assert res.json() == {"remaining": 4, "completed": False}
-    assert store.questions[questions[1]["question_id"]].answer is None
+    assert interview_repo.list_questions(read_db, dream_id)[1].answer is None
 
     body = client.get(f"/dreams/{dream_id}/interview").json()
     assert body["answered"] == 2
@@ -119,7 +116,7 @@ def test_answer_and_skip_update_progress(llm):
     assert llm.kind_count("reextract") == 0
 
 
-def test_answer_can_be_changed_before_reextract(llm):
+def test_answer_can_be_changed_before_reextract(llm, read_db):
     dream_id = _text_dream()
     question_id = client.get(f"/dreams/{dream_id}/interview").json()["questions"][0]["question_id"]
 
@@ -127,8 +124,9 @@ def test_answer_can_be_changed_before_reextract(llm):
     res = client.post(f"/dreams/{dream_id}/interview", json={"question_id": question_id, "answer": "기억났어요"})
 
     assert res.status_code == 200
-    assert store.questions[question_id].answer == "기억났어요"
-    assert store.questions[question_id].skipped is False
+    question = interview_repo.list_questions(read_db, dream_id)[0]
+    assert question.answer == "기억났어요"
+    assert question.skipped is False
 
 
 def test_answer_rejected_for_question_of_other_dream(llm):
@@ -150,15 +148,15 @@ def test_answer_rejected_before_questions_exist(llm):
     assert res.json()["error"]["detail"]["status"] == "recorded"
 
 
-def test_llm_format_failure_returns_502_and_saves_nothing(monkeypatch):
+def test_llm_format_failure_returns_502_and_saves_nothing(monkeypatch, read_db):
     monkeypatch.setattr(llm_client, "openai_complete", FakeLlm(mode="bad_format"))
     dream_id = _text_dream()
 
     res = client.get(f"/dreams/{dream_id}/interview")
     assert res.status_code == 502
     assert res.json()["error"]["code"] == "LLM_FAILED"
-    assert store.questions == {}
-    assert store.extractions == {}
+    assert rows.questions(read_db) == []
+    assert rows.extractions(read_db) == []
     assert client.get(f"/dreams/{dream_id}").json()["status"] == "recorded"
 
     monkeypatch.setattr(llm_client, "openai_complete", FakeLlm())
@@ -174,7 +172,7 @@ def test_llm_timeout_returns_504(monkeypatch):
     assert res.json()["error"]["code"] == "UPSTREAM_TIMEOUT"
 
 
-def test_concurrent_first_get_calls_llm_once(monkeypatch):
+def test_concurrent_first_get_calls_llm_once(monkeypatch, read_db):
     llm = FakeLlm(delay=0.3)
     monkeypatch.setattr(llm_client, "openai_complete", llm)
     dream_id = _text_dream()
@@ -185,5 +183,32 @@ def test_concurrent_first_get_calls_llm_once(monkeypatch):
     assert [r.status_code for r in responses] == [200] * 5
     assert llm.kind_count("extract_and_ask") == 1
     assert len({tuple(q["question_id"] for q in r.json()["questions"]) for r in responses}) == 1
-    assert len(store.questions) == 6
-    assert len(store.extractions) == 1
+    assert len(rows.questions(read_db)) == 6
+    assert len(rows.extractions(read_db)) == 1
+
+
+def test_questions_saved_by_other_process_are_returned_on_conflict(llm, monkeypatch, session_factory, read_db):
+    """잠금이 닿지 않는 다른 서버 프로세스가 LLM 호출 중에 먼저 저장하면 (dream_id, order) 유니크 제약에 걸린다.
+    rollback 후 먼저 저장된 질문을 돌려준다."""
+    dream_id = _text_dream()
+    real_extract = interview_service.extract_and_ask
+    other: list[int] = []
+
+    def _other_process_saves_first(text: str):
+        result = real_extract(text)
+        with session_factory.begin() as s:
+            extraction_repo.save_extraction(s, dream_id, "raw", result.model_dump(mode="json"), len(text))
+            saved = interview_repo.save_questions(s, dream_id, [q.model_dump(mode="json") for q in result.questions])
+            dream_repo.transition_status(s, dream_id, DreamStatus.RECORDED, DreamStatus.INTERVIEWING)
+            other.extend(q.id for q in saved)
+        return result
+
+    monkeypatch.setattr(interview_service, "extract_and_ask", _other_process_saves_first)
+
+    res = client.get(f"/dreams/{dream_id}/interview")
+
+    assert res.status_code == 200, res.text
+    assert [q["question_id"] for q in res.json()["questions"]] == other
+    assert len(rows.questions(read_db)) == 6
+    assert len(rows.extractions(read_db)) == 1
+    assert dream_repo.get_dream(read_db, dream_id).status == DreamStatus.INTERVIEWING.value
