@@ -12,8 +12,6 @@ client = TestClient(app)
 
 JSON_CASES = [
     ("get", "/dreams", {}, 200, mock_data.DREAM_LIST),
-    ("post", "/dreams/1/jobs", {"json": mock_data.JOB_CREATE}, 202, mock_data.JOB_CREATED),
-    ("get", "/jobs/1", {}, 200, mock_data.JOB),
     ("get", "/dreams/1/scenes", {}, 200, mock_data.SCENES),
     ("post", "/dreams/1/renders", {}, 202, mock_data.RENDER_CREATED),
     ("get", "/dreams/1/renders/latest", {}, 200, mock_data.RENDER),

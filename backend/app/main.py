@@ -1,4 +1,6 @@
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,8 +10,17 @@ from fastapi.staticfiles import StaticFiles
 from app.api import router as api_router
 from app.core.config import settings
 from app.core.errors import AudioTooLarge, error_body, register_error_handlers
+from app.jobs import runner
 
-app = FastAPI(title="Dream Restore API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # 재시작 전 BackgroundTasks의 작업은 사라졌으므로 running·queued로 남은 작업을 실패 처리한다
+    runner.recover_interrupted()
+    yield
+
+
+app = FastAPI(title="Dream Restore API", version="0.1.0", lifespan=lifespan)
 
 _AUDIO_UPLOAD_PATH = re.compile(r"^/dreams/\d+/audio$")
 _MULTIPART_MARGIN_BYTES = 1024 * 1024

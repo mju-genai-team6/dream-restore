@@ -16,7 +16,6 @@ from app.schemas.interview import (
     InterviewQuestionItem,
     InterviewResponse,
 )
-from app.services import repo_bridge
 from app.services.llm_calls import call_llm, dream_lock
 from app.services.state_machine import ensure_transition
 from app.services.transactions import commit, rollback
@@ -107,7 +106,7 @@ def save_answer(db: Session, dream_id: int, body: AnswerCreate) -> AnswerRespons
 
     # 재추출이 진행 중이면 끝날 때까지 기다린 뒤 아래 검사로 막는다
     with dream_lock(dream_id):
-        latest = repo_bridge.get_latest_extraction(db, dream_id)
+        latest = extraction_repo.get_latest_extraction(db, dream_id)
         if latest is not None and latest.phase == ExtractionPhase.AFTER_INTERVIEW.value:
             raise InvalidState(
                 "답변을 반영한 요소 정리가 끝나 답변을 바꿀 수 없습니다.", {"status": dream.status}
