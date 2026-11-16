@@ -40,6 +40,17 @@ class TimestampMixin(CreatedAtMixin):
     )
 
 
+def relative_path_check(column: str) -> CheckConstraint:
+    """storage/ 기준 상대 경로만 허용. /·\\로 시작, 드라이브 문자(C:), '..'가 들어간 경로는 거부.
+
+    제약 이름은 ck_<테이블>_<column>_relative.
+    """
+    return CheckConstraint(
+        f"{column} !~ '^[/\\\\]' AND {column} !~ '^[A-Za-z]:' AND {column} NOT LIKE '%..%'",
+        name=f"{column}_relative",
+    )
+
+
 def enum_check(column: str, enum_cls: type[StrEnum], name: str | None = None) -> CheckConstraint:
     """`column IN (enums.py의 값들)` CHECK 제약. 제약 이름은 ck_<테이블>_<name>."""
     values = ", ".join(f"'{member.value}'" for member in enum_cls)

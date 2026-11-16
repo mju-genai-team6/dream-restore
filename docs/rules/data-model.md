@@ -35,6 +35,19 @@ erDiagram
 - 파일은 `storage/`에 저장하고, DB에는 `storage/` 기준 상대 경로 문자열만 둡니다.
 - `order`는 SQL 예약어라 직접 SQL을 쓸 때는 `"order"`처럼 따옴표로 감싸야 합니다.
 
+## 무결성 규칙 (DB가 직접 막음)
+
+코드에서 실수해도 데이터가 틀어지지 않도록 DB 제약·트리거로 지킵니다. 위반하면 `IntegrityError`가 납니다.
+
+| 규칙 | 방법 |
+| --- | --- |
+| 상태 변경은 조건부로 | `repositories.dreams.transition_status`가 `WHERE status = 현재값`으로 변경. 동시 요청은 한 번만 성공 |
+| 진행 중 작업 중복 금지 | `jobs` 부분 유니크 인덱스 `uq_jobs_active` (`NULLS NOT DISTINCT`) |
+| 장면 버전은 추가만 | 트리거 `scene_versions_guard`: `scene_id`, `version_no`, `summary_ko`, `prompt_en`, `element_ids`는 수정 불가. `final_prompt`, `model`, `settings`, `seed`, `image_path`, `generated_at`, `confidence_level`은 비어 있을 때 한 번만 채울 수 있음. `status`는 변경 가능 |
+| 영상의 장면 버전 고정 | 트리거 `renders_guard`: `scene_version_ids` 수정 불가 |
+| 파일과 기록 구분 | 경로 컬럼(`audio_files.path`, `scene_versions.image_path`, `renders.video_path`, `narrations.audio_path`)은 상대 경로만. `/`·`\`·드라이브 문자(`C:`)로 시작하거나 `..`이 들어가면 거부 |
+| 확신도는 사용자 입력만 | `save_extraction`은 확신도를 비워 두고, 값은 `set_confidences`로만 저장 (DB가 입력 주체를 구분할 수는 없어 함수 규칙으로 지킴) |
+
 ## 테이블
 
 ### dreams — 꿈 기록

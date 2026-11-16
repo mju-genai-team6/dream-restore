@@ -15,7 +15,14 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import Confidence, JobStatus
-from app.db.base import Base, CreatedAtMixin, IdMixin, TimestampMixin, enum_check
+from app.db.base import (
+    Base,
+    CreatedAtMixin,
+    IdMixin,
+    TimestampMixin,
+    enum_check,
+    relative_path_check,
+)
 
 
 class Scene(IdMixin, TimestampMixin, Base):
@@ -35,13 +42,21 @@ class Scene(IdMixin, TimestampMixin, Base):
 
 
 class SceneVersion(IdMixin, TimestampMixin, Base):
-    """장면 버전. 수정은 새 행으로 추가하고 기존 행은 바꾸지 않는다."""
+    """장면 버전. 수정은 새 행으로 추가하고 기존 행은 바꾸지 않는다.
+
+    DB 트리거(scene_versions_guard)가 지킨다:
+    - scene_id, version_no, summary_ko, prompt_en, element_ids는 바꿀 수 없다.
+    - final_prompt, model, settings, seed, image_path, generated_at, confidence_level은
+      비어 있을 때 한 번만 채울 수 있다 (이미지 생성 결과·장면 확신도).
+    - status는 바꿀 수 있다.
+    """
 
     __tablename__ = "scene_versions"
     __table_args__ = (
         UniqueConstraint("scene_id", "version_no"),
         enum_check("confidence_level", Confidence),
         enum_check("status", JobStatus),
+        relative_path_check("image_path"),
     )
 
     scene_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("scenes.id", ondelete="CASCADE"))
@@ -60,10 +75,10 @@ class SceneVersion(IdMixin, TimestampMixin, Base):
 
 
 class Render(IdMixin, TimestampMixin, Base):
-    """영상. scene_version_ids는 렌더 시작 시 고정하고 이후 바꾸지 않는다."""
+    """영상. scene_version_ids는 렌더 시작 시 고정하고 이후 바꾸지 않는다 (DB 트리거 renders_guard)."""
 
     __tablename__ = "renders"
-    __table_args__ = (enum_check("status", JobStatus),)
+    __table_args__ = (enum_check("status", JobStatus), relative_path_check("video_path"))
 
     dream_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("dreams.id", ondelete="CASCADE"), index=True)
     status: Mapped[str] = mapped_column(String(20), server_default=JobStatus.QUEUED.value)
@@ -79,6 +94,7 @@ class Narration(IdMixin, CreatedAtMixin, Base):
     """(선택) 나레이션."""
 
     __tablename__ = "narrations"
+    __table_args__ = (relative_path_check("audio_path"),)
 
     scene_version_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("scene_versions.id", ondelete="CASCADE"), index=True
