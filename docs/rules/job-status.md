@@ -20,4 +20,5 @@
 
 - 실행 상태: `queued`, `running`, `succeeded`, `failed`
 - 실패 사유: `TIMEOUT`, `CONTENT_POLICY`, `PROVIDER_ERROR`, `INVALID_INPUT`, `LLM_SCHEMA`, `RENDER_FAILED`, `INTERRUPTED`
+- `JobError`가 아닌 예외로 실패한 작업은 DB에 `error_code`를 NULL로 두고, API에서는 `error.code = "INTERNAL_ERROR"`로 보여 준다 (`FailureCode` 값이 아님)
 - 확신도: `high`(확실), `medium`(보통), `low`(흐릿) — 값 이름은 11/7 회의에서 확정
