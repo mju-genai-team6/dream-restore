@@ -30,6 +30,24 @@
 
 `characters`, `style_prompt`는 선택입니다. D 출력에 등장 인물이 확정되면 C가 채워 줍니다.
 
+### 세계관 인물 적용 (선택 기능)
+
+등록된 인물(`world_entities`)이 꿈에 나오면 등록 외형을 그대로 넣어, 다른 날의 꿈에서도 같은 모습으로 그립니다.
+
+```json
+"characters": [
+  {"name": "grandma", "age_range": "70s", "hair": "short white bob", "outfit": "pink knitted cardigan",
+   "features": "round gold-rimmed glasses", "appearance": "holding a yellow umbrella"}
+]
+```
+
+- 외형 문구는 `나이대 → 머리 → 옷차림 → 특징 → appearance` 순서로 만듭니다 (`Character.from_world_entity`).
+  `appearance`는 이번 꿈에서만 다른 점이고 없어도 됩니다.
+- `age_range`, `hair`, `outfit`, `features` 중 하나라도 있으면 세계관 인물로 처리하고, 없으면 기존처럼 `appearance`만 씁니다.
+- **C 연결 방법**: 장면의 요소 중 `dream_elements.entity_id`가 있는 인물은 `world.get_entity()`로 읽어
+  `name, age_range, hair, outfit, features`를 그대로 `characters`에 넣어 주세요.
+- 이미지 프롬프트는 영어이므로 B2 등록 화면의 외형 입력도 영어 문구를 권장합니다. 한국어도 동작은 하지만 결과가 덜 정확할 수 있습니다.
+
 **확신도는 넣지 않습니다.** 이미지는 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현합니다 (E1 합의).
 스토리보드는 원본을, 영상은 블러를 적용한 이미지를 씁니다. payload에 `confidence_style`이 들어와도 무시하고 경고 로그만 남깁니다.
 

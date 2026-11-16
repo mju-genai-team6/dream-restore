@@ -8,6 +8,8 @@ payload (Job API가 넣어 줌):
     version_no: int            새로 만들 장면 버전 번호 (원본은 덮어쓰지 않음)
     image_prompt_en: str       D가 만든 장면 프롬프트 (app/llm/schemas.py Scene.image_prompt_en)
     characters: list[dict]     (선택) [{"name": "할머니", "appearance": "white hair, pink cardigan, ..."}]
+                               세계관 인물이면 world_entities 항목을 그대로 넣는다 (계획서 2장 선택 기능)
+                               {"name", "age_range", "hair", "outfit", "features", "appearance"(선택, 이번 꿈에서만 다른 점)}
     style_prompt: str          (선택) 꿈 전체 공통 화풍. 없으면 기본 화풍
 
 확신도는 받지 않는다. 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현한다 (E1 합의).
@@ -37,7 +39,7 @@ from app.jobs.context import JobContext, JobError
 from app.jobs.registry import register
 from app.storage import paths
 from worker.image_gen.config import image_settings as img_cfg
-from worker.image_gen.prompt import Character, build_prompt
+from worker.image_gen.prompt import WORLD_ENTITY_FIELDS, Character, build_prompt
 
 # OpenAI가 콘텐츠 정책 위반으로 거절할 때 주는 오류 코드
 _CONTENT_POLICY_CODES = {"content_policy_violation", "moderation_blocked"}
@@ -70,7 +72,12 @@ def _parse_characters(raw: Any) -> list[Character]:
     for item in raw:
         if not isinstance(item, dict) or not str(item.get("name", "")).strip():
             raise JobError(FailureCode.INVALID_INPUT, f"characters 항목에 name이 필요합니다: {item!r}")
-        result.append(Character(name=str(item["name"]), appearance=str(item.get("appearance") or "")))
+        entity_fields = {k: item[k] for k in WORLD_ENTITY_FIELDS if item.get(k)}
+        if entity_fields:
+            # 등록된 세계관 인물: 등록 외형을 먼저, 이번 꿈의 appearance는 뒤에 덧붙인다
+            result.append(Character.from_world_entity(str(item["name"]), extra=item.get("appearance"), **entity_fields))
+        else:
+            result.append(Character(name=str(item["name"]), appearance=str(item.get("appearance") or "")))
     return result
 
 
