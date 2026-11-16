@@ -34,6 +34,7 @@ erDiagram
 - 꿈 기록(`dreams`)을 지우면 딸린 데이터가 모두 함께 지워집니다(ON DELETE CASCADE).
 - 파일은 `storage/`에 저장하고, DB에는 `storage/` 기준 상대 경로 문자열만 둡니다.
 - `order`는 SQL 예약어라 직접 SQL을 쓸 때는 `"order"`처럼 따옴표로 감싸야 합니다.
+- 마이그레이션은 `tests/repositories/test_migrations.py`가 빈 DB에서 `upgrade head` → 한 단계 `downgrade` → 다시 `upgrade` → `downgrade base`까지 확인합니다.
 
 ## 무결성 규칙 (DB가 직접 막음)
 
@@ -185,7 +186,7 @@ erDiagram
 | --- | --- | --- |
 | dream_id | FK dreams | |
 | render_id | FK renders, NULL | |
-| kind | text | 평가 종류 (E1·E2와 확정 후 CHECK 추가) |
+| kind | text | 평가 종류 CHECK(`confidence` E1 확신도, `character` E2 인물 일관성). 다른 값은 저장되지 않음 |
 | condition | text | 비교 조건 |
 | score | smallint | 1~5 |
 

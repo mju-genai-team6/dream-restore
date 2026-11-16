@@ -15,6 +15,9 @@ from app.db.base import Base, CreatedAtMixin, IdMixin, TimestampMixin
 
 WORLD_ENTITY_KINDS = (ElementType.PERSON.value, ElementType.PLACE.value)
 
+# 평가 종류: E1 확신도 표현 평가, E2 인물 일관성 평가. 지표 뷰(metric_views 마이그레이션)와 같아야 한다
+EVALUATION_KINDS = ("confidence", "character")
+
 
 class WorldEntity(IdMixin, TimestampMixin, Base):
     """여러 꿈에 반복해 나오는 인물·장소. 외형 항목은 B2·E2와 맞춘다."""
@@ -34,10 +37,13 @@ class Evaluation(IdMixin, CreatedAtMixin, Base):
     """5점 척도 평가 응답 (E1 확신도 평가, E2 인물 일관성 평가)."""
 
     __tablename__ = "evaluations"
-    __table_args__ = (CheckConstraint("score BETWEEN 1 AND 5", name="score"),)
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 1 AND 5", name="score"),
+        CheckConstraint(f"kind IN ({', '.join(repr(k) for k in EVALUATION_KINDS)})", name="kind"),
+    )
 
     dream_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("dreams.id", ondelete="CASCADE"), index=True)
     render_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("renders.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(30))  # 평가 종류. 값은 E1·E2와 확정 후 CHECK 추가
+    kind: Mapped[str] = mapped_column(String(30))  # 평가 종류 (EVALUATION_KINDS)
     condition: Mapped[str] = mapped_column(String(50))  # 비교 조건 (예: 블러 적용/미적용)
     score: Mapped[int] = mapped_column(SmallInteger)
