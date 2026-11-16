@@ -66,7 +66,7 @@ erDiagram
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | dream_id | FK dreams | |
-| path | text | `dreams/{dreamId}/audio/{audioId}.webm` |
+| path | text | `dreams/{dreamId}/audio/{uuid}.webm` (파일 이름은 uuid, `docs/rules/file-paths.md` 기준) |
 | mime_type | text | `audio/webm`, `audio/mp4`, `audio/x-m4a` |
 | size | bigint | 바이트 |
 | duration | float, NULL | 초 |
@@ -92,6 +92,8 @@ erDiagram
 | description | text | 꿈 속 묘사, 없으면 빈 문자열 |
 | confidence | text, NULL | `high`, `medium`, `low`. **사용자 입력만 저장**, 입력 전에는 NULL |
 | entity_id | FK world_entities, NULL | (선택) 세계관 인물·장소 연결 |
+
+꿈의 요소 목록은 **가장 최근 `extraction_id`의 요소만** 사용합니다 (`list_elements`, `get_latest_extraction`). 재추출하면 이전 추출의 요소는 지표용으로만 남습니다.
 
 ### interview_questions — 되묻기 질문
 

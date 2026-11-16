@@ -43,8 +43,14 @@ def save_extraction(
     return extraction
 
 
-def _latest_extraction_id(db: Session, dream_id: int, phase: ExtractionPhase | str | None) -> int | None:
-    query = select(Extraction.id).where(Extraction.dream_id == dream_id)
+def get_latest_extraction(
+    db: Session, dream_id: int, phase: ExtractionPhase | str | None = None
+) -> Extraction | None:
+    """가장 최근 추출 1건. 없으면 None. phase를 주면 그 단계 중 최근 것.
+
+    list_elements가 쓰는 추출과 같다 (꿈의 요소 목록은 가장 최근 추출 기준).
+    """
+    query = select(Extraction).where(Extraction.dream_id == dream_id)
     if phase is not None:
         query = query.where(Extraction.phase == str(phase))
     return db.scalar(query.order_by(Extraction.created_at.desc(), Extraction.id.desc()).limit(1))
@@ -55,9 +61,10 @@ def list_elements(db: Session, dream_id: int, phase: ExtractionPhase | str | Non
 
     phase를 주지 않으면 마지막 추출(인터뷰 후 재추출이 있으면 그것)을 쓴다.
     """
-    extraction_id = _latest_extraction_id(db, dream_id, phase)
-    if extraction_id is None:
+    latest = get_latest_extraction(db, dream_id, phase)
+    if latest is None:
         return []
+    extraction_id = latest.id
     return list(
         db.scalars(select(DreamElement).where(DreamElement.extraction_id == extraction_id).order_by(DreamElement.id))
     )

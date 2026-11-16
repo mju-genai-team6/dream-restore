@@ -57,6 +57,17 @@ def get_job(db: Session, job_id: int) -> Job | None:
     return db.get(Job, job_id)
 
 
+def get_active_jobs(db: Session, dream_id: int) -> list[Job]:
+    """꿈 기록의 진행 중(queued·running) 작업 목록. 만든 순서대로."""
+    return list(
+        db.scalars(
+            select(Job)
+            .where(Job.dream_id == dream_id, Job.status.in_(ACTIVE_JOB_STATUSES))
+            .order_by(Job.created_at, Job.id)
+        )
+    )
+
+
 def update_job(
     db: Session,
     job_id: int,

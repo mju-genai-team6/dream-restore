@@ -22,8 +22,21 @@ def get_dream(db: Session, dream_id: int) -> Dream | None:
     return db.get(Dream, dream_id)
 
 
-def update_confirmed_text(db: Session, dream_id: int, confirmed_text: str) -> Dream | None:
-    """원문 확정. 꿈 기록이 없으면 None. 상태 검사는 C(services)가 한다."""
+def update_raw_text(db: Session, dream_id: int, raw_text: str) -> Dream | None:
+    """입력 원문(STT 변환 결과)을 저장한다. 꿈 기록이 없으면 None."""
+    dream = db.get(Dream, dream_id)
+    if dream is None:
+        return None
+    dream.raw_text = raw_text
+    db.flush()
+    return dream
+
+
+def update_confirmed_text(db: Session, dream_id: int, confirmed_text: str | None) -> Dream | None:
+    """원문 확정. None을 넘기면 확정 원문을 비운다(다시 녹음할 때). 꿈 기록이 없으면 None.
+
+    상태 검사는 C(services)가 한다.
+    """
     dream = db.get(Dream, dream_id)
     if dream is None:
         return None
