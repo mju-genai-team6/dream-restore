@@ -116,7 +116,9 @@ docker compose ps        # db 상태가 healthy인지 확인
 
 - 직접 들여다보기: `docker compose exec db psql -U dream -d dream`
 - 테이블 만들기·갱신: `cd backend && alembic upgrade head` (스키마 변경은 Alembic으로만, 마이그레이션 파일은 C2만 만듭니다)
-- 완전히 초기화: `docker compose down -v` 후 다시 `up -d db` (데이터가 모두 지워집니다)
+- 샘플 데이터 넣기: `cd backend && python scripts/seed.py` (익명 샘플 꿈 5건, 상태별 1건씩. 꿈 기록이 이미 있으면 넣지 않음)
+- 비우고 다시 시작: `cd backend && python scripts/reset_db.py` (모든 데이터를 지우고 마이그레이션·샘플을 다시 넣음, 로컬 DB에서만 실행됨)
+- 완전히 초기화: `docker compose down -v` 후 다시 `up -d db` (테스트 DB까지 모두 지워집니다)
 - 5432 포트가 이미 쓰이고 있으면 로컬에 설치된 PostgreSQL을 끄고 다시 실행하세요.
 
 ### 5. 실행
