@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.core.enums import JobStatus
-from app.repositories import audio, dreams, extractions, renders, scenes
+from app.repositories import audio, dreams, evaluations, extractions, renders, scenes
 from tests.repositories.helpers import ELEMENTS_PAYLOAD, SCENES
 
 
@@ -106,3 +106,18 @@ def test_relative_path_allowed(db):
 def test_image_path_must_be_relative(db, scene_list):
     version = scene_list[0].current_version
     _expect_rejected(db, lambda: setattr(version, "image_path", "/tmp/original.png"))
+
+
+# --- 평가 종류는 지표 뷰가 읽는 값만 -----------------------------------------
+
+
+@pytest.mark.parametrize("kind", ["confidence", "character"])
+def test_evaluation_kind_allowed(db, kind):
+    dream = dreams.create_dream(db, input_type="text", raw_text="원문")
+    assert evaluations.save_evaluation(db, dream_id=dream.id, kind=kind, condition="A", score=3).id is not None
+
+
+def test_unknown_evaluation_kind_rejected(db):
+    dream = dreams.create_dream(db, input_type="text", raw_text="원문")
+    with pytest.raises(IntegrityError), db.begin_nested():
+        evaluations.save_evaluation(db, dream_id=dream.id, kind="consistency", condition="A", score=3)

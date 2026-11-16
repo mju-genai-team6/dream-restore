@@ -34,6 +34,7 @@ erDiagram
 - 꿈 기록(`dreams`)을 지우면 딸린 데이터가 모두 함께 지워집니다(ON DELETE CASCADE).
 - 파일은 `storage/`에 저장하고, DB에는 `storage/` 기준 상대 경로 문자열만 둡니다.
 - `order`는 SQL 예약어라 직접 SQL을 쓸 때는 `"order"`처럼 따옴표로 감싸야 합니다.
+- 마이그레이션은 `tests/repositories/test_migrations.py`가 빈 DB에서 `upgrade head` → 한 단계 `downgrade` → 다시 `upgrade` → `downgrade base`까지 확인합니다.
 
 ## 무결성 규칙 (DB가 직접 막음)
 
@@ -66,7 +67,7 @@ erDiagram
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | dream_id | FK dreams | |
-| path | text | `dreams/{dreamId}/audio/{audioId}.webm` |
+| path | text | `dreams/{dreamId}/audio/{uuid}.webm` (파일 이름은 uuid, `docs/rules/file-paths.md` 기준) |
 | mime_type | text | `audio/webm`, `audio/mp4`, `audio/x-m4a` |
 | size | bigint | 바이트 |
 | duration | float, NULL | 초 |
@@ -92,6 +93,8 @@ erDiagram
 | description | text | 꿈 속 묘사, 없으면 빈 문자열 |
 | confidence | text, NULL | `high`, `medium`, `low`. **사용자 입력만 저장**, 입력 전에는 NULL |
 | entity_id | FK world_entities, NULL | (선택) 세계관 인물·장소 연결 |
+
+꿈의 요소 목록은 **가장 최근 `extraction_id`의 요소만** 사용합니다 (`list_elements`, `get_latest_extraction`). 재추출하면 이전 추출의 요소는 지표용으로만 남습니다.
 
 ### interview_questions — 되묻기 질문
 
@@ -183,7 +186,7 @@ erDiagram
 | --- | --- | --- |
 | dream_id | FK dreams | |
 | render_id | FK renders, NULL | |
-| kind | text | 평가 종류 (E1·E2와 확정 후 CHECK 추가) |
+| kind | text | 평가 종류 CHECK(`confidence` E1 확신도, `character` E2 인물 일관성). 다른 값은 저장되지 않음 |
 | condition | text | 비교 조건 |
 | score | smallint | 1~5 |
 
@@ -279,3 +282,9 @@ docker compose exec -T db pg_dump -U dream -d dream --format=custom > backup_202
 # 복원 (기존 데이터를 지우고 백업 시점으로)
 docker compose exec -T db pg_restore -U dream -d dream --clean --if-exists < backup_20261128.dump
 ```
+
+- 위 명령은 **Git Bash**에서 실행합니다. Windows PowerShell 5의 `>`·`<`는 바이너리 파일을 깨뜨립니다.
+- 셸과 상관없이 하려면 컨테이너 안에 파일로 만든 뒤 꺼냅니다.
+  `docker compose exec db pg_dump -U dream -d dream --format=custom -f /tmp/backup.dump` →
+  `docker compose cp db:/tmp/backup.dump backup_20261128.dump`
+- 11/16에 빈 DB로 복원해 꿈·장면 버전·작업 수, 마이그레이션 버전, 뷰 4개, 트리거 2개가 원본과 같은지 확인했습니다.
