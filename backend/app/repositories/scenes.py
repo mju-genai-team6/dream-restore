@@ -87,6 +87,10 @@ def set_current_version(db: Session, scene_id: int, version_id: int) -> Scene | 
     return scene
 
 
+def get_scene_version(db: Session, scene_version_id: int) -> SceneVersion | None:
+    return db.get(SceneVersion, scene_version_id)
+
+
 def list_scenes(db: Session, dream_id: int) -> list[Scene]:
     """장면 목록 (order 순서). 각 장면의 현재 버전은 scene.current_version으로 읽는다."""
     return list(
