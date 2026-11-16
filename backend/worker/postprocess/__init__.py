@@ -9,6 +9,7 @@ from worker.postprocess.blur import (
 )
 from worker.postprocess.confidence import (
     CONFIDENCE_SCORES,
+    CONFIDENCE_STYLE_PROMPTS,
     LOW_UPPER_BOUND,
     MEDIUM_UPPER_BOUND,
     RULE_VERSION,
@@ -18,6 +19,7 @@ from worker.postprocess.confidence import (
     SceneConfidenceResult,
     aggregate_scene_confidence,
     aggregate_scene_confidence_detail,
+    confidence_style_for,
     level_for_mean_score,
     parse_confidence,
     parse_element_type,
@@ -26,6 +28,7 @@ from worker.postprocess.confidence import (
 
 __all__ = [
     "CONFIDENCE_SCORES",
+    "CONFIDENCE_STYLE_PROMPTS",
     "DEFAULT_BLUR_SETTINGS",
     "LOW_UPPER_BOUND",
     "MEDIUM_UPPER_BOUND",
@@ -40,6 +43,7 @@ __all__ = [
     "aggregate_scene_confidence",
     "aggregate_scene_confidence_detail",
     "apply_confidence_blur",
+    "confidence_style_for",
     "level_for_mean_score",
     "parse_confidence",
     "parse_element_type",
