@@ -14,8 +14,8 @@
 | 409 | VERSION_CONFLICT | 장면 수정 기준 버전이 최신이 아님 |
 | 413 | AUDIO_TOO_LARGE | 음성 파일 25MB 초과 |
 | 415 | UNSUPPORTED_AUDIO | 허용하지 않은 음성 형식 |
-| 502 | STT_FAILED, LLM_FAILED | 외부 AI 호출 실패 (질문 조회·요소 목록 조회에서 LLM 형식 오류가 재요청 후에도 남은 경우 포함) |
-| 504 | UPSTREAM_TIMEOUT | 외부 AI 응답 시간 초과 (질문 조회·요소 목록 조회) |
+| 502 | STT_FAILED, LLM_FAILED | 외부 AI 호출 실패 (질문 조회·요소 목록 조회에서 LLM 형식 오류가 재요청 후에도 남은 경우 포함). 음성 업로드의 STT 실패와 빈 변환 결과는 STT_FAILED |
+| 504 | UPSTREAM_TIMEOUT | 외부 AI 응답 시간 초과 (음성 업로드 STT·질문 조회·요소 목록 조회) |
 
 400 VALIDATION_ERROR의 `detail`: 요청 형식 오류는 `{"errors": [...]}`, 목록에 없는 id는 `{"element_ids": [...]}`.
 
