@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from sqlalchemy import (
     ARRAY,
     BigInteger,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -9,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import Confidence, JobStatus
 from app.db.base import Base, CreatedAtMixin, IdMixin, TimestampMixin, enum_check
@@ -24,6 +27,10 @@ class Scene(IdMixin, TimestampMixin, Base):
     # scene_versions와 서로 참조하므로 FK는 테이블 생성 후 따로 건다 (use_alter)
     current_version_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("scene_versions.id", ondelete="SET NULL", use_alter=True)
+    )
+    # 조회용. 현재 버전을 바꿀 때는 current_version_id를 바꾼다 (repositories.scenes.set_current_version)
+    current_version: Mapped["SceneVersion | None"] = relationship(
+        foreign_keys=[current_version_id], viewonly=True
     )
 
 
@@ -46,6 +53,7 @@ class SceneVersion(IdMixin, TimestampMixin, Base):
     settings: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     seed: Mapped[int | None] = mapped_column(BigInteger)
     image_path: Mapped[str | None] = mapped_column(String(500))  # storage/ 기준 상대 경로
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # 이미지 생성 완료 시각 (E2 요청)
     element_ids: Mapped[list[int]] = mapped_column(ARRAY(BigInteger), server_default="{}")
     confidence_level: Mapped[str | None] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(20), server_default=JobStatus.QUEUED.value)

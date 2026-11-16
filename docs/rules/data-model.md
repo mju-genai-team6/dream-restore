@@ -117,6 +117,7 @@ erDiagram
 | settings | jsonb | 생성 설정 (E2) |
 | seed | bigint, NULL | (E2) |
 | image_path | text, NULL | `dreams/{dreamId}/scenes/{sceneId}/v{versionNo}/original.png` |
+| generated_at | timestamptz, NULL | 이미지 생성 완료 시각 (E2 요청) |
 
 ### renders — 영상
 
