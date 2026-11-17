@@ -6,12 +6,15 @@ from app.services import mock_data
 
 
 class InterviewQuestionItem(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": mock_data.QUESTION_ITEM_EXAMPLES})
+
     question_id: int
     order: int
     target_element: str | None = None
     question: str
     answered: bool
     skipped: bool
+    answer: str | None = Field(description="답변 내용. 답하지 않았거나 건너뛰면 null.")
 
 
 class InterviewResponse(BaseModel):

@@ -2092,6 +2092,18 @@
           "skipped": {
             "type": "boolean",
             "title": "Skipped"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer",
+            "description": "답변 내용. 답하지 않았거나 건너뛰면 null."
           }
         },
         "type": "object",
@@ -2100,9 +2112,36 @@
           "order",
           "question",
           "answered",
-          "skipped"
+          "skipped",
+          "answer"
         ],
-        "title": "InterviewQuestionItem"
+        "title": "InterviewQuestionItem",
+        "examples": [
+          {
+            "answer": "흰 머리에 분홍색 카디건을 입고 있었어요.",
+            "answered": true,
+            "order": 2,
+            "question": "할머니는 어떤 모습이었나요?",
+            "question_id": 2,
+            "skipped": false,
+            "target_element": "할머니"
+          },
+          {
+            "answered": true,
+            "order": 3,
+            "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요.",
+            "question_id": 3,
+            "skipped": true,
+            "target_element": "할머니"
+          },
+          {
+            "answered": false,
+            "order": 6,
+            "question": "꿈이 어떻게 끝났는지 기억나나요?",
+            "question_id": 6,
+            "skipped": false
+          }
+        ]
       },
       "InterviewResponse": {
         "properties": {
@@ -2131,9 +2170,10 @@
         "title": "InterviewResponse",
         "examples": [
           {
-            "answered": 6,
+            "answered": 5,
             "questions": [
               {
+                "answer": "형광등이 깜빡이고 복도가 어두웠어요.",
                 "answered": true,
                 "order": 1,
                 "question": "복도에서 기억나는 것을 자유롭게 말해 주세요.",
@@ -2142,6 +2182,7 @@
                 "target_element": "학교 복도"
               },
               {
+                "answer": "흰 머리에 분홍색 카디건을 입고 있었어요.",
                 "answered": true,
                 "order": 2,
                 "question": "할머니는 어떤 모습이었나요?",
@@ -2158,6 +2199,7 @@
                 "target_element": "할머니"
               },
               {
+                "answer": "노란색 장우산이었어요.",
                 "answered": true,
                 "order": 4,
                 "question": "우산은 어떻게 생겼나요?",
@@ -2166,6 +2208,7 @@
                 "target_element": "우산"
               },
               {
+                "answer": "창밖이 온통 회색 바다였고 파도가 높았어요.",
                 "answered": true,
                 "order": 5,
                 "question": "바다를 봤을 때 주변은 어땠나요?",
@@ -2174,7 +2217,7 @@
                 "target_element": "바다"
               },
               {
-                "answered": true,
+                "answered": false,
                 "order": 6,
                 "question": "꿈이 어떻게 끝났는지 기억나나요?",
                 "question_id": 6,

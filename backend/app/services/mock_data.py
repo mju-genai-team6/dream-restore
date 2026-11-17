@@ -76,6 +76,35 @@ DREAM_LIST = {
     "next_cursor": None,
 }
 
+_ANSWERED_QUESTION = {
+    "question_id": 2,
+    "order": 2,
+    "target_element": "할머니",
+    "question": "할머니는 어떤 모습이었나요?",
+    "answered": True,
+    "skipped": False,
+    "answer": "흰 머리에 분홍색 카디건을 입고 있었어요.",
+}
+_SKIPPED_QUESTION = {
+    "question_id": 3,
+    "order": 3,
+    "target_element": "할머니",
+    "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요.",
+    "answered": True,
+    "skipped": True,
+    "answer": None,
+}
+_UNANSWERED_QUESTION = {
+    "question_id": 6,
+    "order": 6,
+    "target_element": None,
+    "question": "꿈이 어떻게 끝났는지 기억나나요?",
+    "answered": False,
+    "skipped": False,
+    "answer": None,
+}
+QUESTION_ITEM_EXAMPLES = [_ANSWERED_QUESTION, _SKIPPED_QUESTION, _UNANSWERED_QUESTION]
+
 INTERVIEW = {
     "questions": [
         {
@@ -85,23 +114,10 @@ INTERVIEW = {
             "question": "복도에서 기억나는 것을 자유롭게 말해 주세요.",
             "answered": True,
             "skipped": False,
+            "answer": "형광등이 깜빡이고 복도가 어두웠어요.",
         },
-        {
-            "question_id": 2,
-            "order": 2,
-            "target_element": "할머니",
-            "question": "할머니는 어떤 모습이었나요?",
-            "answered": True,
-            "skipped": False,
-        },
-        {
-            "question_id": 3,
-            "order": 3,
-            "target_element": "할머니",
-            "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요.",
-            "answered": True,
-            "skipped": True,
-        },
+        _ANSWERED_QUESTION,
+        _SKIPPED_QUESTION,
         {
             "question_id": 4,
             "order": 4,
@@ -109,6 +125,7 @@ INTERVIEW = {
             "question": "우산은 어떻게 생겼나요?",
             "answered": True,
             "skipped": False,
+            "answer": "노란색 장우산이었어요.",
         },
         {
             "question_id": 5,
@@ -117,17 +134,11 @@ INTERVIEW = {
             "question": "바다를 봤을 때 주변은 어땠나요?",
             "answered": True,
             "skipped": False,
+            "answer": "창밖이 온통 회색 바다였고 파도가 높았어요.",
         },
-        {
-            "question_id": 6,
-            "order": 6,
-            "target_element": None,
-            "question": "꿈이 어떻게 끝났는지 기억나나요?",
-            "answered": True,
-            "skipped": False,
-        },
+        _UNANSWERED_QUESTION,
     ],
-    "answered": 6,
+    "answered": 5,
     "total": 6,
 }
 
