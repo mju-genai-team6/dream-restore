@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useDreams } from "./store";
 import { formatDate } from "./types";
 import StoryboardPanel from "./StoryboardPanel";
@@ -25,7 +26,7 @@ export default function DreamResults() {
   return <div className={styles.app}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span className={styles.brandMark}>✦</span><div><strong>꿈 기록</strong><span>기억을 한 장면씩</span></div></div>
-      <nav className={styles.navigation} aria-label="결과 및 보관 메뉴">{views.map((item) => <button type="button" key={item.id} className={`${styles.navItem} ${view === item.id ? styles.activeNav : ""}`} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><Icon name={item.icon} size={21} />{item.title}</button>)}</nav>
+      <nav className={styles.navigation} aria-label="결과 및 보관 메뉴"><Link href="/record" className={styles.navItem}><Icon name="mic" size={21} />꿈 기록하기</Link>{views.map((item) => <button type="button" key={item.id} className={`${styles.navItem} ${view === item.id ? styles.activeNav : ""}`} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><Icon name={item.icon} size={21} />{item.title}</button>)}</nav>
       <div className={styles.sidebarDecoration} aria-hidden="true"><span>✧</span><Icon name="moon" size={62} /><span>✦</span></div>
       <div className={styles.demoInfo}><span className={styles.demoBadge}>예시 모드</span><p>수정한 내용은<br />이 브라우저에만 보관돼요.</p></div>
     </aside>
