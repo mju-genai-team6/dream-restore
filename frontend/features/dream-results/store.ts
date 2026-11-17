@@ -29,7 +29,7 @@ function validStoredDreams(value: unknown): value is Dream[] {
         Array.isArray(version.elements) && version.elements.length === latestVersion(seed).elements.length &&
         version.elements.every((element, elementIndex) => element.id === latestVersion(seed).elements[elementIndex].id &&
           element.name === latestVersion(seed).elements[elementIndex].name &&
-          (["high", "medium", "low"] as Confidence[]).includes(element.confidence)),
+          element.confidence !== null && (["high", "medium", "low"] as Confidence[]).includes(element.confidence)),
       );
     });
   });
