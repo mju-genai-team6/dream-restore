@@ -6,7 +6,7 @@ export type ArtworkKind = "school" | "sea" | "village" | "house" | "person";
 export type DreamElement = {
   id: string;
   name: string;
-  confidence: Confidence;
+  confidence: Confidence | null;
 };
 
 export type SceneVersion = {
@@ -21,6 +21,7 @@ export type SceneVersion = {
 export type Scene = {
   id: string;
   artwork: ArtworkKind;
+  imageUrl?: string | null;
   imageStatus: JobStatus;
   versions: SceneVersion[];
 };
@@ -34,6 +35,7 @@ export type DreamVideo = {
 export type Dream = {
   id: string;
   title: string;
+  thumbnailUrl?: string | null;
   recordedAt: string;
   originalText: string;
   status: DreamStatus;
