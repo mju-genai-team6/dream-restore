@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useDreams } from "./store";
 import { formatDate, type Dream, type Scene } from "./types";
 import { listArchiveDreams, listArchiveScenes } from "./archive-api";
@@ -36,6 +37,7 @@ function ResultsLayout({ view, onNavigate, dream, fromApi = false, children }: {
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span className={styles.brandMark}>✦</span><div><strong>꿈 기록</strong><span>기억을 한 장면씩</span></div></div>
       <nav className={styles.navigation} aria-label="결과 및 보관 메뉴">
+        <Link href="/record" className={styles.navItem}><Icon name="mic" size={21} />꿈 기록하기</Link>
         {availableViews.map((item) => <button type="button" key={item.id} className={`${styles.navItem} ${view === item.id ? styles.activeNav : ""}`} aria-current={view === item.id ? "page" : undefined} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={21} />{item.title}</button>)}
       </nav>
       <div className={styles.sidebarDecoration} aria-hidden="true"><span>✧</span><Icon name="moon" size={62} /><span>✦</span></div>

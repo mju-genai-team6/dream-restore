@@ -15,6 +15,7 @@ npm.cmd run dev
 
 ## 현재 화면
 
+- 꿈 기록 (`/record`): 음성·텍스트 입력, 원문 확인, 되묻기, 확신도 선택
 - 스토리보드: 장면 선택, 내용과 확신도 수정, 이전 버전 조회
 - 꿈 보관함: 제목 검색, 기록 상세, 스토리보드 재열람
 - 영상 결과: 영상 미완료 안내와 결과 URL 기반 재생 화면
@@ -34,7 +35,7 @@ npm.cmd run dev
 
 목업 서버는 샘플 꿈을 반환하며, 이미지 파일이 없으면 화면에 **이미지 없음**이 표시됩니다. 서버 조회 모드에서는 보관함과 장면 조회를 제공합니다. 환경 변수를 설정하지 않은 경우 기존 예시 화면을 사용합니다.
 
-세부 파일 역할과 연동 범위는 features/dream-results/README.md 를 참고하세요. API 공통 규칙은 ../docs/rules/ 에 있습니다.
+기록 화면 안내는 [기록 흐름 README](features/dream-record/README.md), 결과 화면 안내는 [결과·보관 README](features/dream-results/README.md)를 참고하세요. API 공통 규칙은 ../docs/rules/ 에 있습니다.
 
 ## 확인 명령
 

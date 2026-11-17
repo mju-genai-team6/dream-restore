@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 const paths = {
+  mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z M19 11a7 7 0 0 1-14 0 M12 18v3 M8 21h8",
   storyboard: "M3 4h18v16H3z M3 14l5-5 5 5 3-3 5 5 M8 7h.01",
   video: "M4 4h16v16H4z M10 8l6 4-6 4z",
   archive: "M4 8h16v13H4z M3 3h18v5H3z M9 12h6",
