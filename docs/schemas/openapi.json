@@ -443,6 +443,40 @@
               }
             }
           },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -515,6 +549,40 @@
                     "detail": {
                       "status": "interviewing"
                     }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
                   }
                 },
                 "schema": {
@@ -648,7 +716,7 @@
         "tags": [
           "elements"
         ],
-        "summary": "요소 목록 (인터뷰 반영)",
+        "summary": "요소 목록 (인터뷰 완료 후 첫 호출 시 재추출)",
         "operationId": "list_elements_dreams__dream_id__elements_get",
         "parameters": [
           {
@@ -710,6 +778,40 @@
               }
             }
           },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -728,7 +830,7 @@
         "tags": [
           "elements"
         ],
-        "summary": "요소별 확신도 저장",
+        "summary": "요소별 확신도 저장 (일부만 보내도 됨)",
         "operationId": "set_confidences_dreams__dream_id__elements_confidence_put",
         "parameters": [
           {
@@ -837,7 +939,7 @@
         "tags": [
           "jobs"
         ],
-        "summary": "장면 생성 요청 (진행 중이면 기존 job_id)",
+        "summary": "장면 생성 요청 (진행 중이면 기존 작업을 202로 반환)",
         "operationId": "create_job_dreams__dream_id__jobs_post",
         "parameters": [
           {
@@ -866,7 +968,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobCreateResponse"
+                  "$ref": "#/components/schemas/JobSummary"
                 }
               }
             }
@@ -946,7 +1048,7 @@
         "tags": [
           "jobs"
         ],
-        "summary": "작업 조회 (상태, 단계, 실패 사유)",
+        "summary": "작업 조회 (상태, 단계, 시도 횟수, 실패 사유)",
         "operationId": "get_job_jobs__job_id__get",
         "parameters": [
           {
@@ -965,7 +1067,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
+                  "$ref": "#/components/schemas/JobSummary"
                 }
               }
             }
@@ -2103,33 +2205,19 @@
           }
         ]
       },
-      "JobCreateResponse": {
-        "properties": {
-          "job_id": {
-            "type": "integer",
-            "title": "Job Id"
-          },
-          "status": {
-            "$ref": "#/components/schemas/JobStatus"
-          }
-        },
-        "type": "object",
-        "required": [
-          "job_id",
-          "status"
-        ],
-        "title": "JobCreateResponse",
-        "examples": [
-          {
-            "job_id": 1,
-            "status": "queued"
-          }
-        ]
-      },
       "JobError": {
         "properties": {
           "code": {
-            "$ref": "#/components/schemas/FailureCode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureCode"
+              },
+              {
+                "type": "string",
+                "const": "INTERNAL_ERROR"
+              }
+            ],
+            "title": "Code"
           },
           "message": {
             "type": "string",
@@ -2142,88 +2230,6 @@
           "message"
         ],
         "title": "JobError"
-      },
-      "JobResponse": {
-        "properties": {
-          "job_id": {
-            "type": "integer",
-            "title": "Job Id"
-          },
-          "dream_id": {
-            "type": "integer",
-            "title": "Dream Id"
-          },
-          "type": {
-            "$ref": "#/components/schemas/JobType"
-          },
-          "status": {
-            "$ref": "#/components/schemas/JobStatus"
-          },
-          "stage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JobStage"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "error": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JobError"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "job_id",
-          "dream_id",
-          "type",
-          "status",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "JobResponse",
-        "examples": [
-          {
-            "created_at": "2026-11-14T09:00:00+09:00",
-            "dream_id": 1,
-            "job_id": 1,
-            "stage": "prompting",
-            "status": "succeeded",
-            "type": "generate_scenes",
-            "updated_at": "2026-11-14T09:03:00+09:00"
-          },
-          {
-            "created_at": "2026-11-14T09:00:00+09:00",
-            "dream_id": 1,
-            "error": {
-              "code": "LLM_SCHEMA",
-              "message": "장면을 만들지 못했습니다. 다시 시도해 주세요."
-            },
-            "job_id": 1,
-            "stage": "prompting",
-            "status": "failed",
-            "type": "generate_scenes",
-            "updated_at": "2026-11-14T09:03:00+09:00"
-          }
-        ]
       },
       "JobStage": {
         "type": "string",
@@ -2270,6 +2276,85 @@
                 "type": "null"
               }
             ]
+          },
+          "dream_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dream Id"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
           }
         },
         "type": "object",
@@ -2279,12 +2364,40 @@
           "status"
         ],
         "title": "JobSummary",
-        "description": "꿈 조회의 진행 중 작업, SSE 이벤트 data에 쓴다. 퍼센트 값은 두지 않는다.",
+        "description": "작업 등록·조회 응답, 꿈 조회의 진행 중 작업, SSE 이벤트 data에 쓴다. 퍼센트 값은 두지 않는다.",
         "examples": [
           {
+            "attempt": 0,
+            "created_at": "2026-11-14T09:00:00+09:00",
+            "dream_id": 1,
             "job_id": 1,
-            "stage": "splitting",
-            "status": "running",
+            "status": "queued",
+            "type": "generate_scenes"
+          },
+          {
+            "attempt": 1,
+            "created_at": "2026-11-14T09:00:00+09:00",
+            "dream_id": 1,
+            "finished_at": "2026-11-14T09:03:00+09:00",
+            "job_id": 1,
+            "stage": "prompting",
+            "started_at": "2026-11-14T09:00:00+09:00",
+            "status": "succeeded",
+            "type": "generate_scenes"
+          },
+          {
+            "attempt": 1,
+            "created_at": "2026-11-14T09:00:00+09:00",
+            "dream_id": 1,
+            "error": {
+              "code": "LLM_SCHEMA",
+              "message": "장면을 만들지 못했습니다. 다시 시도해 주세요."
+            },
+            "finished_at": "2026-11-14T09:03:00+09:00",
+            "job_id": 1,
+            "stage": "prompting",
+            "started_at": "2026-11-14T09:00:00+09:00",
+            "status": "failed",
             "type": "generate_scenes"
           }
         ]

@@ -2,8 +2,9 @@
 from pathlib import PurePosixPath
 
 
-def audio(dream_id: int, audio_id: int, ext: str) -> PurePosixPath:
-    return PurePosixPath(f"dreams/{dream_id}/audio/{audio_id}.{ext}")
+def audio(dream_id: int, file_id: str, ext: str) -> PurePosixPath:
+    """file_id는 uuid hex. DB 기록 전에 경로가 필요해서 audio_id를 쓰지 않는다."""
+    return PurePosixPath(f"dreams/{dream_id}/audio/{file_id}.{ext}")
 
 
 def _scene_dir(dream_id: int, scene_id: int, version_no: int) -> PurePosixPath:

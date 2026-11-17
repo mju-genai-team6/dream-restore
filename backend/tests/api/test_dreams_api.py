@@ -1,24 +1,19 @@
 """꿈 기록 생성·조회·원문 확정 API (C-S1-05)."""
-import pytest
 from fastapi.testclient import TestClient
 
 from app.core.enums import DreamStatus
 from app.main import app
-from app.services.stubs import dreams as dream_repo
-from app.services.stubs import store
+from app.repositories import dreams as dream_repo
+from app.repositories import extractions as extraction_repo
+from app.repositories import renders as render_repo
+from app.repositories import scenes as scene_repo
+from tests.repositories.helpers import ELEMENTS_PAYLOAD, SCENES
 
 client = TestClient(app)
 
 VOICE = {"input_type": "voice"}
 TEXT = {"input_type": "text", "text": "학교 복도에서 할머니를 만났다."}
 CONFIRM = {"confirmed_text": "확정한 원문"}
-
-
-@pytest.fixture(autouse=True)
-def _clear_dream_store():
-    store.clear()
-    yield
-    store.clear()
 
 
 def test_voice_dream_create_get_and_confirm():
@@ -80,10 +75,44 @@ def test_unknown_dream_returns_not_found():
     assert confirmed.json()["error"]["code"] == "NOT_FOUND"
 
 
-def test_confirm_rejected_when_status_is_not_recorded():
+def test_text_dream_is_saved_to_db(read_db):
+    dream_id = client.post("/dreams", json=TEXT).json()["dream_id"]
+
+    dream = dream_repo.get_dream(read_db, dream_id)
+    assert dream.input_type == "text"
+    assert dream.raw_text == dream.confirmed_text == TEXT["text"]
+    assert dream.status == DreamStatus.RECORDED.value
+
+
+def test_latest_render_and_is_latest(session_factory):
+    dream_id = client.post("/dreams", json=TEXT).json()["dream_id"]
+    with session_factory.begin() as s:
+        extraction_repo.save_extraction(s, dream_id, "after_interview", ELEMENTS_PAYLOAD, text_length=10)
+        first_scene = scene_repo.create_scenes(s, dream_id, SCENES)[0]
+        queued = render_repo.create_render(s, dream_id)
+    assert client.get(f"/dreams/{dream_id}").json()["latest_render"] is None
+
+    with session_factory.begin() as s:
+        render_repo.complete_render(
+            s, queued.id, video_path=f"dreams/{dream_id}/renders/{queued.id}/video.mp4", width=1280, height=720, duration=9
+        )
+    assert client.get(f"/dreams/{dream_id}").json()["latest_render"] == {
+        "render_id": queued.id,
+        "video_url": f"/storage/dreams/{dream_id}/renders/{queued.id}/video.mp4",
+        "is_latest": True,
+    }
+
+    with session_factory.begin() as s:
+        revised = scene_repo.add_scene_version(s, first_scene.id, summary_ko="수정", prompt_en="revised")
+        scene_repo.set_current_version(s, first_scene.id, revised.id)
+    assert client.get(f"/dreams/{dream_id}").json()["latest_render"]["is_latest"] is False
+
+
+def test_confirm_rejected_when_status_is_not_recorded(session_factory):
     created = client.post("/dreams", json=VOICE)
     dream_id = created.json()["dream_id"]
-    dream_repo.transition_status(None, dream_id, DreamStatus.INTERVIEWING.value)
+    with session_factory.begin() as s:
+        dream_repo.transition_status(s, dream_id, DreamStatus.RECORDED, DreamStatus.INTERVIEWING)
 
     res = client.patch(f"/dreams/{dream_id}", json=CONFIRM)
     assert res.status_code == 409

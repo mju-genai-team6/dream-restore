@@ -30,6 +30,13 @@ _ERROR_EXAMPLES: dict[int, tuple[str, str, str, dict[str, Any]]] = {
         "webm, mp4, m4a 형식의 음성 파일만 올릴 수 있습니다.",
         {},
     ),
+    502: ("외부 AI 호출 실패", "LLM_FAILED", "질문을 만들지 못했습니다. 다시 시도해 주세요.", {}),
+    504: (
+        "외부 AI 응답 시간 초과",
+        "UPSTREAM_TIMEOUT",
+        "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+        {},
+    ),
 }
 
 

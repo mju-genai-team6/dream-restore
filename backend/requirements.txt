@@ -9,4 +9,5 @@ python-multipart
 sse-starlette
 httpx
 Pillow
-openai
+openai>=3,<4
+mutagen

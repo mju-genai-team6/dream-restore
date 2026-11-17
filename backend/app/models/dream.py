@@ -10,7 +10,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.enums import DreamStatus, InputType
-from app.db.base import Base, CreatedAtMixin, IdMixin, TimestampMixin, enum_check
+from app.db.base import (
+    Base,
+    CreatedAtMixin,
+    IdMixin,
+    TimestampMixin,
+    enum_check,
+    relative_path_check,
+)
 
 # 이관 문서 2장: mime_type CHECK(webm, mp4, m4a)
 AUDIO_MIME_TYPES = ("audio/webm", "audio/mp4", "audio/x-m4a")
@@ -36,6 +43,7 @@ class AudioFile(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "audio_files"
     __table_args__ = (
         CheckConstraint(f"mime_type IN ({', '.join(repr(m) for m in AUDIO_MIME_TYPES)})", name="mime_type"),
+        relative_path_check("path"),
     )
 
     dream_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("dreams.id", ondelete="CASCADE"), index=True)

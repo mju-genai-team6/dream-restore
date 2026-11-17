@@ -1,0 +1,49 @@
+{
+  "description": "인물 일관성 실험용 테스트 꿈 (E2 계획서 3.3). 인물 2명이 5개 장면 중 4개씩 등장한다. 실제 참가자 꿈이 아닌 작성한 예시.",
+  "characters": [
+    {
+      "key": "grandma",
+      "label_ko": "할머니",
+      "name": "the grandmother",
+      "appearance": "elderly Korean woman in her 70s, short white bob hair, round gold-rimmed glasses, pink knitted cardigan over a cream blouse, small mole under her left eye"
+    },
+    {
+      "key": "brother",
+      "label_ko": "남동생",
+      "name": "the little brother",
+      "appearance": "10-year-old Korean boy, short straight black hair with bangs, bright yellow raincoat, red sneakers, freckles across his nose"
+    }
+  ],
+  "scenes": [
+    {
+      "order": 1,
+      "summary_ko": "할머니와 남동생이 형광등이 깜빡이는 어두운 학교 복도를 함께 걷는다.",
+      "characters": ["grandma", "brother"],
+      "prompt": "{grandma} and {brother} walking side by side down a long dark school hallway with flickering fluorescent lights"
+    },
+    {
+      "order": 2,
+      "summary_ko": "창가에서 할머니가 남동생에게 노란 우산을 건넨다.",
+      "characters": ["grandma", "brother"],
+      "prompt": "{grandma} handing a yellow umbrella to {brother} next to a classroom window, close-up of both faces"
+    },
+    {
+      "order": 3,
+      "summary_ko": "남동생이 혼자 회색 바다가 보이는 모래사장에 서 있다.",
+      "characters": ["brother"],
+      "prompt": "{brother} standing alone on a sandy beach facing a gray stormy sea with high waves, seen from the side"
+    },
+    {
+      "order": 4,
+      "summary_ko": "할머니가 바다 위에 떠 있는 버스 의자에 앉아 손을 흔든다.",
+      "characters": ["grandma"],
+      "prompt": "{grandma} sitting on an old bus seat floating on a calm sea, waving her hand, surreal"
+    },
+    {
+      "order": 5,
+      "summary_ko": "비 오는 학교 옥상에서 할머니와 남동생이 노란 우산을 함께 쓰고 있다.",
+      "characters": ["grandma", "brother"],
+      "prompt": "{grandma} and {brother} sharing a yellow umbrella on a rainy school rooftop, facing the viewer"
+    }
+  ]
+}

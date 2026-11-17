@@ -12,13 +12,16 @@ from app.core.enums import Confidence, FailureCode, JobStage, JobType
 from app.jobs.context import JobError
 from app.jobs.registry import HANDLERS
 from app.storage import paths as storage_paths
+from worker.image_gen.prompt import build_prompt
 from worker.postprocess import (
+    CONFIDENCE_STYLE_PROMPTS,
     BlurSettings,
     ConfidenceInputError,
     PostprocessImageError,
     aggregate_scene_confidence,
     aggregate_scene_confidence_detail,
     apply_confidence_blur,
+    confidence_style_for,
     level_for_mean_score,
     postprocess_scene_for_storage,
     score_for_confidence,
@@ -26,6 +29,7 @@ from worker.postprocess import (
 from worker.render import (
     RenderExecutionError,
     RenderSettings,
+    RenderTimeoutError,
     SceneRenderInput,
     calculate_scene_timeline,
     compose_slideshow_video,
@@ -33,6 +37,7 @@ from worker.render import (
     resolve_ffmpeg_binary,
     verify_rendered_video,
 )
+from worker.render.video import _build_filter_complex
 
 
 class FakeJobContext:
@@ -232,9 +237,92 @@ def test_postprocess_scene_for_storage_follows_path_rules(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
+def _require_ffmpeg() -> str:
+    """로컬 개발 환경에 FFmpeg가 없으면 DB 테스트(conftest.py)처럼 통합 테스트만 skip한다."""
+    try:
+        return resolve_ffmpeg_binary()
+    except RenderExecutionError as exc:
+        pytest.skip(f"FFmpeg가 설치되어 있지 않아 FFmpeg 실행 테스트를 건너뜁니다: {exc}")
+
+
 def test_render_video_handler_registered():
     assert JobType.RENDER_VIDEO in HANDLERS
     assert HANDLERS[JobType.RENDER_VIDEO] is handle_render_video
+
+
+def test_confidence_style_prompts_match_e2_prompt_builder():
+    assert set(CONFIDENCE_STYLE_PROMPTS) == {Confidence.HIGH, Confidence.MEDIUM, Confidence.LOW}
+    for level in Confidence:
+        style = confidence_style_for(level.value)
+        assert style
+        built = build_prompt("A dark school hallway", confidence_style=style)
+        assert f"Memory clarity: {style}." in built
+
+
+def test_build_filter_complex_without_ffmpeg_binary(tmp_path: Path):
+    nar = tmp_path / "nar.mp3"
+    nar.write_bytes(b"fake-mp3")
+    settings = RenderSettings(width=1280, height=720, fps=30, default_scene_duration=4.0, transition_duration=0.5)
+    filter_str, has_audio = _build_filter_complex(
+        scene_durations=[4.0, 5.2, 4.0],
+        start_offsets=[0.0, 3.5, 8.2],
+        total_duration=12.2,
+        valid_narrations=[None, nar, None],
+        settings=settings,
+    )
+    assert has_audio is True
+    assert "scale=2560:1440:force_original_aspect_ratio=decrease" in filter_str
+    assert "pad=2560:1440" in filter_str
+    assert "zoompan=" in filter_str
+    assert "xfade=transition=fade:duration=0.500:offset=3.500" in filter_str
+    assert "adelay=3500|3500" in filter_str
+    assert "amix=inputs=2" in filter_str
+
+
+def test_compose_and_verify_with_mocked_ffmpeg(tmp_path: Path, monkeypatch):
+    from worker.render import video as video_mod
+
+    img1 = _make_checker_image(tmp_path / "s1.png", size=(640, 360))
+    img2 = _make_checker_image(tmp_path / "s2.png", size=(640, 360))
+    out_mp4 = tmp_path / "mocked.mp4"
+
+    recorded_cmds: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        recorded_cmds.append(list(cmd))
+        # 합성 호출이면 가짜 MP4 파일 생성, 검증 호출이면 스트림 헤더 stderr 반환
+        if "-frames:v" in cmd:
+            stderr = (
+                "  Duration: 00:00:07.50, start: 0.000000, bitrate: 400 kb/s\n"
+                "  Stream #0:0(und): Video: h264 (High), yuv420p, 1280x720, 30 fps\n"
+            )
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr=stderr)
+        Path(cmd[-1]).write_bytes(b"fake-mp4-stream")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(video_mod, "resolve_ffmpeg_binary", lambda: "/mock/ffmpeg")
+    monkeypatch.setattr(video_mod.subprocess, "run", fake_run)
+
+    comp = compose_slideshow_video(
+        [
+            SceneRenderInput(order=1, scene_id=1, version_no=1, image_path=img1),
+            SceneRenderInput(order=2, scene_id=2, version_no=1, image_path=img2),
+        ],
+        out_mp4,
+    )
+    assert comp.width == 1280 and comp.height == 720
+    assert comp.duration == pytest.approx(7.5)
+    assert recorded_cmds[0][0] == "/mock/ffmpeg"
+
+    def fake_timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["/mock/ffmpeg"], timeout=1.0)
+
+    monkeypatch.setattr(video_mod.subprocess, "run", fake_timeout)
+    with pytest.raises(RenderTimeoutError):
+        compose_slideshow_video(
+            [SceneRenderInput(order=1, scene_id=1, version_no=1, image_path=img1)],
+            tmp_path / "timeout.mp4",
+        )
 
 
 def test_calculate_scene_timeline_with_overlap():
@@ -251,6 +339,7 @@ def test_calculate_scene_timeline_with_overlap():
 
 
 def test_handle_render_video_end_to_end_and_retry_reuse(tmp_path: Path):
+    _require_ffmpeg()
     ctx = FakeJobContext(storage_root=tmp_path, dream_id=7, job_id=101)
 
     # 정사각형(512x512) 및 와이드(640x360) 이미지를 섞어 여백(pad) 처리도 함께 검증
@@ -333,11 +422,11 @@ def test_handle_render_video_end_to_end_and_retry_reuse(tmp_path: Path):
 
 
 def test_compose_with_narration_extends_duration_and_adds_audio(tmp_path: Path):
+    ffmpeg_exe = _require_ffmpeg()
     img1 = _make_checker_image(tmp_path / "s1.png", size=(640, 360))
     img2 = _make_checker_image(tmp_path / "s2.png", size=(640, 360))
 
     # 2.0초 길이의 테스트 나레이션 오디오 생성
-    ffmpeg_exe = resolve_ffmpeg_binary()
     nar1 = tmp_path / "nar1.mp3"
     subprocess.run(
         [
@@ -390,6 +479,7 @@ def test_handle_render_video_fails_when_image_missing(tmp_path: Path):
 
 
 def test_verify_rendered_video_rejects_wrong_resolution(tmp_path: Path):
+    _require_ffmpeg()
     img = _make_checker_image(tmp_path / "s1.png", size=(640, 360))
     out_video = tmp_path / "small.mp4"
     compose_slideshow_video(

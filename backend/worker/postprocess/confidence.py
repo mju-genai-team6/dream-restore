@@ -28,6 +28,13 @@ CONFIDENCE_SCORES: dict[Confidence, int] = {
     Confidence.LOW: 0,
 }
 
+# E2(worker/image_gen/prompt.py)에서 "Memory clarity: <문구>." 형태로 붙이는 확신도 스타일 문구
+CONFIDENCE_STYLE_PROMPTS: dict[Confidence, str] = {
+    Confidence.HIGH: "sharp focus, crisp and vivid details, clear textures",
+    Confidence.MEDIUM: "soft focus, slightly hazy edges, gentle dreamlike mist",
+    Confidence.LOW: "very hazy dreamy fog, soft diffused silhouettes, faded indistinct details",
+}
+
 VISUAL_ELEMENT_TYPES: frozenset[ElementType] = frozenset(
     {
         ElementType.PERSON,
@@ -114,6 +121,12 @@ def score_for_confidence(confidence: Confidence | str) -> int:
     """확신도 단계를 점수(high=2, medium=1, low=0)로 변환한다."""
     parsed = parse_confidence(confidence)
     return CONFIDENCE_SCORES[parsed]
+
+
+def confidence_style_for(confidence: Confidence | str) -> str:
+    """확신도 단계에 대응하는 E2 이미지 프롬프트 스타일 문구를 반환한다."""
+    parsed = parse_confidence(confidence)
+    return CONFIDENCE_STYLE_PROMPTS[parsed]
 
 
 def level_for_mean_score(mean_score: float) -> Confidence:

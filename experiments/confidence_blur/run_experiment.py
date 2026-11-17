@@ -281,8 +281,8 @@ def run_blur_candidates_experiment(base_img_path: Path) -> list[dict]:
 
 
 def run_resolution_normalization_experiment() -> list[dict]:
-    """실험 2-2: 서로 다른 입력 해상도(640×360, 1024×1024, 1280×720, 1920×1080)에서 반경 보정 확인."""
-    resolutions = [(640, 360), (1024, 1024), (1280, 720), (1920, 1080)]
+    """실험 2-2: 서로 다른 입력 해상도(640×360, 1024×1024, 1280×720, 1536×1024, 1920×1080)에서 반경 보정 확인."""
+    resolutions = [(640, 360), (1024, 1024), (1280, 720), (1536, 1024), (1920, 1080)]
     settings = BlurSettings(high_radius=0.0, medium_radius=6.0, low_radius=16.0, reference_long_edge=1280)
     rows: list[dict] = []
 
