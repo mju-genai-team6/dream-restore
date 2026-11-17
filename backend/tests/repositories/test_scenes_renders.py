@@ -135,3 +135,15 @@ def test_world_entities_and_evaluations(db, dream):
 
     evaluation = evaluations.save_evaluation(db, dream_id=dream.id, kind="confidence", condition="blur", score=4)
     assert evaluation.id is not None and evaluation.score == 4
+
+
+def test_fail_render_marks_failed_but_keeps_succeeded(db, dream):
+    scenes.create_scenes(db, dream.id, SCENES)
+    failed = renders.create_render(db, dream.id)
+    assert renders.fail_render(db, failed.id).status == JobStatus.FAILED
+    assert renders.get_latest_render(db, dream.id) is None  # 실패한 영상은 최신 영상이 아님
+
+    done = renders.create_render(db, dream.id)
+    renders.complete_render(db, done.id, video_path="v.mp4", width=1280, height=720, duration=12.0)
+    assert renders.fail_render(db, done.id).status == JobStatus.SUCCEEDED  # 완료된 영상은 덮지 않음
+    assert renders.fail_render(db, 999_999_999) is None

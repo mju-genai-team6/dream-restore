@@ -58,6 +58,21 @@ def complete_render(
     return render
 
 
+def fail_render(db: Session, render_id: int) -> Render | None:
+    """렌더를 failed로 바꾼다. 렌더가 없으면 None.
+
+    이미 succeeded인 렌더는 바꾸지 않고 그대로 돌려준다 (완료된 영상을 실패로 덮지 않음).
+    실패 사유는 jobs.error_code·error_message에 기록한다 (renders에는 사유 컬럼이 없음).
+    """
+    render = db.get(Render, render_id)
+    if render is None:
+        return None
+    if render.status != JobStatus.SUCCEEDED.value:
+        render.status = JobStatus.FAILED.value
+        db.flush()
+    return render
+
+
 class LatestRender(NamedTuple):
     render: Render
     is_latest: bool  # 영상에 쓴 장면 버전이 지금 장면들의 현재 버전과 같으면 True
