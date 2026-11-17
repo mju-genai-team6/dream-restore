@@ -1248,7 +1248,7 @@
         "tags": [
           "renders"
         ],
-        "summary": "영상 생성 요청",
+        "summary": "영상 생성 요청 (진행 중이면 기존 작업을 202로 반환)",
         "operationId": "create_render_dreams__dream_id__renders_post",
         "parameters": [
           {
@@ -1328,7 +1328,7 @@
         "tags": [
           "renders"
         ],
-        "summary": "최신 영상 조회 (반영된 장면 버전, is_latest)",
+        "summary": "최신 영상 조회 (검증 끝난 영상만, 반영된 장면 버전, is_latest)",
         "operationId": "get_latest_render_dreams__dream_id__renders_latest_get",
         "parameters": [
           {

@@ -489,3 +489,19 @@ def test_verify_rendered_video_rejects_wrong_resolution(tmp_path: Path):
     )
     with pytest.raises(RenderExecutionError, match="해상도"):
         verify_rendered_video(out_video, expected_width=1280, expected_height=720)
+
+
+def test_local_pipeline_script_runs_end_to_end(monkeypatch, tmp_path):
+    """scripts/e1_local_pipeline.py: OpenAI 목업 이미지 → 블러 → 영상까지 tmp 저장소에서 끝까지 돈다."""
+    _require_ffmpeg()
+    import scripts.e1_local_pipeline as pipeline
+    import worker.image_gen.generate as image_gen
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "storage_path", tmp_path)  # cached_property라 값을 직접 바꾼다
+    monkeypatch.setattr(image_gen, "get_client", image_gen.get_client)  # 스크립트가 바꾼 것을 테스트 후 되돌림
+    monkeypatch.setattr("sys.argv", ["e1_local_pipeline.py"])
+
+    assert pipeline.main() == 0
+    assert (tmp_path / "dreams/1/renders/1/video.mp4").stat().st_size > 0
+    assert (tmp_path / "dreams/1/scenes/3/v1/blur_medium.png").is_file()
