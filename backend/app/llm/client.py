@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from app.core.config import settings
 
@@ -28,12 +28,20 @@ class LlmCallError(LlmError):
     """외부 AI 호출 자체가 실패함 (키 없음, 네트워크, 제공사 오류)."""
 
 
+class LlmTimeoutError(LlmCallError):
+    """외부 AI가 제한 시간 안에 답하지 않음 (LLM, STT 공통)."""
+
+
 class LlmSchemaError(LlmError):
     """재요청까지 했는데도 LLM 출력이 스키마와 맞지 않음."""
 
 
 class SttError(LlmError):
     """음성 인식 실패."""
+
+
+class SttEmptyResultError(SttError):
+    """음성 인식은 됐지만 인식된 말이 없음 (무음, 너무 짧은 녹음)."""
 
 
 def load_prompt(name: str) -> str:
@@ -60,27 +68,40 @@ def openai_complete(messages: list[Message]) -> str:
             messages=messages,
             response_format={"type": "json_object"},
         )
+    except openai.APITimeoutError as e:
+        raise LlmTimeoutError(f"LLM 응답 시간 초과: {e}") from e
     except openai.OpenAIError as e:
         raise LlmCallError(f"LLM 호출 실패: {e}") from e
     return response.choices[0].message.content or ""
 
 
-def call_json(system: str, user: str, schema: type[T], complete: Complete | None = None) -> T:
+def call_json(
+    system: str,
+    user: str,
+    schema: type[T],
+    complete: Complete | None = None,
+    check: Callable[[T], None] | None = None,
+) -> T:
     """LLM을 호출하고 결과를 schema로 검증해 돌려줍니다.
 
     형식이 틀리면 무엇이 틀렸는지 알려 주며 최대 MAX_RETRIES번 다시 요청합니다.
+    check: 스키마만으로 볼 수 없는 내용 검사(예: 요소 이름이 실제 목록에 있는지).
+           문제가 있으면 ValueError를 던지게 하고, 형식 오류와 똑같이 다시 요청합니다.
     """
     complete = complete or openai_complete
     messages: list[Message] = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
-    last_error: ValidationError | None = None
+    last_error: ValueError | None = None
     for _ in range(1 + MAX_RETRIES):
         raw = complete(messages)
         try:
-            return schema.model_validate_json(raw)
-        except ValidationError as e:
+            result = schema.model_validate_json(raw)
+            if check is not None:
+                check(result)
+            return result
+        except ValueError as e:  # pydantic ValidationError도 ValueError의 한 종류
             last_error = e
             messages += [
                 {"role": "assistant", "content": raw},
