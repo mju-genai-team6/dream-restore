@@ -3,10 +3,7 @@ import threading
 import time
 from pathlib import Path
 
-import httpx
-import openai
-
-from app.llm.client import LlmCallError, load_prompt
+from app.llm.client import LlmTimeoutError, load_prompt
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "docs" / "schemas" / "examples"
 EXTRACTION_JSON = (EXAMPLES / "interview.json").read_text(encoding="utf-8")
@@ -33,11 +30,7 @@ class FakeLlm:
         if self.delay:
             time.sleep(self.delay)
         if self.mode == "timeout":
-            request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-            try:
-                raise openai.APITimeoutError(request=request)
-            except openai.APITimeoutError as exc:
-                raise LlmCallError(f"LLM 호출 실패: {exc}") from exc
+            raise LlmTimeoutError("LLM 응답 시간 초과")
         if self.mode == "bad_format":
             return "{}"
         return ELEMENTS_JSON if kind == "reextract" else EXTRACTION_JSON
