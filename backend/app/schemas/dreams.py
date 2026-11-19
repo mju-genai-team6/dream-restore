@@ -67,9 +67,16 @@ class AudioUploadResponse(BaseModel):
 class DreamListItem(BaseModel):
     dream_id: int
     created_at: datetime
-    thumbnail_url: str | None = None
-    summary: str | None = None
+    thumbnail_url: str | None = Field(
+        default=None, description="첫 장면 현재 버전의 이미지 주소(장면 목록의 image_url과 같은 형식). 없으면 null"
+    )
+    summary: str | None = Field(
+        default=None,
+        description="첫 장면 현재 버전의 요약. 장면이 없으면 확정 원문(없으면 입력 원문) 앞 60자. 둘 다 없으면 null",
+    )
     status: DreamStatus
+    input_type: InputType
+    has_video: bool = Field(description="완료된 영상이 있으면 true")
 
 
 class DreamListResponse(BaseModel):

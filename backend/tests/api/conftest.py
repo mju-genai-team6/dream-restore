@@ -13,6 +13,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.routing import Mount
+from starlette.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.enums import JobType
@@ -45,7 +47,8 @@ def no_real_image_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
     키를 비우고 이미지 생성 모드를 fake로 고정한 뒤 generate_image에 가짜 핸들러를 끼운다.
     setitem이라 lifespan(install_image_handler)이 바꾼 핸들러도 테스트가 끝나면 되돌아간다.
-    가짜 핸들러가 쓰는 파일은 테스트별 임시 폴더에 둔다.
+    가짜 핸들러가 쓰는 파일은 테스트별 임시 폴더에 둔다. /storage 마운트는 import 때 경로로 고정되므로
+    같은 임시 폴더를 보도록 함께 바꾼다.
     """
     for name in ("OPENAI_API_KEY", "IMAGE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
@@ -54,6 +57,13 @@ def no_real_image_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(settings, "image_generation_mode", "fake")
     monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, fake_generate_image)
     monkeypatch.setattr(settings, "storage_path", tmp_path)  # cached_property라 값을 직접 바꾼다
+    static = _storage_files()
+    monkeypatch.setattr(static, "directory", tmp_path)
+    monkeypatch.setattr(static, "all_directories", [tmp_path])
+
+
+def _storage_files() -> StaticFiles:
+    return next(route.app for route in app.routes if isinstance(route, Mount) and route.name == "storage")
 
 
 @pytest.fixture(autouse=True)

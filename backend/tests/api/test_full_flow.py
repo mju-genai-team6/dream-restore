@@ -1,4 +1,4 @@
-"""텍스트 꿈 기록부터 영상 조회까지 전체 흐름 (C-S3-07 준비).
+"""텍스트 꿈 기록부터 영상 조회까지 전체 흐름 (C-S3-07 준비). /storage 파일 제공도 확인한다 (C-S3-06).
 
 LLM은 가짜 응답(FakeLlm, 가짜 split_scenes), 이미지는 conftest의 가짜 핸들러를 쓴다.
 STT는 텍스트 입력이라 불리지 않아야 하므로 불리면 실패하게 바꾼다. 영상은 실제 FFmpeg로 만든다.
@@ -116,3 +116,20 @@ def test_text_dream_to_rendered_video():
     assert [(v["scene_id"], v["version_no"]) for v in data["scene_versions"]] == [
         (scene["scene_id"], scene["version_no"]) for scene in scenes
     ]
+
+    for scene in scenes:
+        _assert_served(scene["image_url"], "image/png")
+    _assert_served(data["video_url"], "video/mp4")
+
+    item = next(item for item in client.get("/dreams").json()["items"] if item["dream_id"] == dream_id)
+    assert item["thumbnail_url"] == scenes[0]["image_url"]
+    assert item["summary"] == scenes[0]["summary_ko"]
+    assert item["has_video"] is True
+    _assert_served(item["thumbnail_url"], "image/png")
+
+
+def _assert_served(url: str, content_type: str) -> None:
+    res = client.get(url)
+    assert res.status_code == 200, url
+    assert res.headers["content-type"] == content_type
+    assert res.content

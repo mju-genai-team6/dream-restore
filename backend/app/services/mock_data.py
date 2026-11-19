@@ -25,6 +25,10 @@ def _image_url(scene_id: int) -> str:
     return paths.public_url(paths.scene_original(DREAM_ID, scene_id, 1))
 
 
+# 장면 이미지 주소 끝의 ?v=는 generated_at(초 단위 타임스탬프). 2026-11-14T09:02:00+09:00
+IMAGE_VERSION = 1794528120
+
+
 VIDEO_URL = paths.public_url(paths.render_video(DREAM_ID, RENDER_ID))
 
 # 요청 예시
@@ -68,9 +72,11 @@ DREAM_LIST = {
         {
             "dream_id": DREAM_ID,
             "created_at": CREATED_AT,
-            "thumbnail_url": _image_url(1),
-            "summary": "어두운 학교 복도에서 할머니에게 노란 우산을 받고, 창밖의 회색 바다를 본 꿈",
+            "thumbnail_url": f"{_image_url(1)}?v={IMAGE_VERSION}",
+            "summary": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
             "status": "rendered",
+            "input_type": "voice",
+            "has_video": True,
         }
     ],
     "next_cursor": None,
@@ -226,9 +232,6 @@ JOB_EVENTS = [
     {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "running", "stage": "prompting"},
     {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "succeeded", "stage": "prompting"},
 ]
-
-# 장면 이미지 주소 끝의 ?v=는 generated_at(초 단위 타임스탬프). 2026-11-14T09:02:00+09:00
-IMAGE_VERSION = 1794528120
 
 SCENES = {
     "scenes": [

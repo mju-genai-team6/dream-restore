@@ -1730,7 +1730,8 @@
                 "type": "null"
               }
             ],
-            "title": "Thumbnail Url"
+            "title": "Thumbnail Url",
+            "description": "첫 장면 현재 버전의 이미지 주소(장면 목록의 image_url과 같은 형식). 없으면 null"
           },
           "summary": {
             "anyOf": [
@@ -1741,17 +1742,28 @@
                 "type": "null"
               }
             ],
-            "title": "Summary"
+            "title": "Summary",
+            "description": "첫 장면 현재 버전의 요약. 장면이 없으면 확정 원문(없으면 입력 원문) 앞 60자. 둘 다 없으면 null"
           },
           "status": {
             "$ref": "#/components/schemas/DreamStatus"
+          },
+          "input_type": {
+            "$ref": "#/components/schemas/InputType"
+          },
+          "has_video": {
+            "type": "boolean",
+            "title": "Has Video",
+            "description": "완료된 영상이 있으면 true"
           }
         },
         "type": "object",
         "required": [
           "dream_id",
           "created_at",
-          "status"
+          "status",
+          "input_type",
+          "has_video"
         ],
         "title": "DreamListItem"
       },
@@ -1788,9 +1800,11 @@
               {
                 "created_at": "2026-11-14T09:00:00+09:00",
                 "dream_id": 1,
+                "has_video": true,
+                "input_type": "voice",
                 "status": "rendered",
-                "summary": "어두운 학교 복도에서 할머니에게 노란 우산을 받고, 창밖의 회색 바다를 본 꿈",
-                "thumbnail_url": "/storage/dreams/1/scenes/1/v1/original.png"
+                "summary": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
+                "thumbnail_url": "/storage/dreams/1/scenes/1/v1/original.png?v=1794528120"
               }
             ]
           }

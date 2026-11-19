@@ -6,31 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import events as event_service
-from app.services import mock_data
 
 client = TestClient(app)
-
-JSON_CASES = [
-    ("get", "/dreams", {}, 200, mock_data.DREAM_LIST),
-]
-
-
-def _normalize(data: dict) -> dict:
-    """응답의 datetime 표기(+09:00 등) 차이를 없애기 위해 키 구조만 비교한다."""
-    if isinstance(data, dict):
-        return {k: _normalize(v) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_normalize(v) for v in data]
-    return None
-
-
-@pytest.mark.parametrize(("method", "path", "kwargs", "status_code", "sample"), JSON_CASES)
-def test_mock_endpoint_returns_sample_with_mock_header(method, path, kwargs, status_code, sample):
-    res = client.request(method.upper(), path, **kwargs)
-
-    assert res.status_code == status_code, res.text
-    assert res.headers["X-Mock"] == "true"
-    assert _normalize(res.json()) == _normalize(sample)
 
 
 def test_events_stream_sends_sample_job_events_and_closes(monkeypatch):
