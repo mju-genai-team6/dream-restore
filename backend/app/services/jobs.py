@@ -6,9 +6,10 @@ from app.core.enums import DreamStatus, ExtractionPhase, JobType
 from app.core.errors import InvalidState, NotFound
 from app.jobs.submit import submit_job
 from app.repositories import extractions as extraction_repo
+from app.repositories import interview as interview_repo
 from app.repositories import jobs as job_repo
 from app.schemas.jobs import JobCreate, JobSummary
-from app.services.interview import require_dream
+from app.services.interview import confirmed_text, require_dream
 from app.services.job_views import job_summary
 from app.services.llm_calls import dream_lock
 from app.services.transactions import expire_loaded
@@ -29,6 +30,28 @@ def _ensure_scenes_requestable(db: Session, dream_id: int) -> None:
         raise InvalidState("모든 요소의 확신도를 선택해 주세요.", {"element_ids": missing})
 
 
+def _scenes_payload(db: Session, dream_id: int) -> dict:
+    """split_scenes에 넘길 값을 요청 시점에 읽는다. 실행 중에는 DB를 다시 읽지 않는다."""
+    dream = require_dream(db, dream_id)
+    return {
+        "text": confirmed_text(dream),
+        "answers": [
+            {"question": row.text, "answer": None if row.skipped else row.answer}
+            for row in interview_repo.list_questions(db, dream_id)
+        ],
+        "elements": [
+            {
+                "id": row.id,
+                "name": row.name,
+                "type": row.type,
+                "description": row.description or "",
+                "confidence": row.confidence,
+            }
+            for row in extraction_repo.list_elements(db, dream_id)
+        ],
+    }
+
+
 def create_job(
     db: Session, dream_id: int, body: JobCreate, background_tasks: BackgroundTasks
 ) -> JobSummary:
@@ -46,6 +69,7 @@ def create_job(
             dream_id=dream_id,
             job_type=JobType(body.type),
             target_id=None,
+            payload=_scenes_payload(db, dream_id),
         )
     return job_summary(job)
 

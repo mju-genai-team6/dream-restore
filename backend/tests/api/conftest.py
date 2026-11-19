@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.jobs import registry, runner
+from app.jobs import runner
 from app.main import app
 
 # 나머지 테이블은 모두 dreams나 world_entities에 딸려 있어 CASCADE로 함께 비워진다
@@ -45,7 +45,6 @@ def api_db(
     작업 실행기와 서버 시작 처리(lifespan)도 같은 테스트 DB 세션을 쓰고, 대기 시간은 0으로 둔다.
     """
     monkeypatch.setattr(runner, "session_factory", session_factory)
-    monkeypatch.setattr(registry, "FAKE_STAGE_SECONDS", 0)
     monkeypatch.setattr(settings, "job_retry_delay_seconds", 0)
     _truncate(db_engine)
 

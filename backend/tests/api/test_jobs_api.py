@@ -1,15 +1,18 @@
-"""작업 실행기와 작업 API (C-S2-04). 장면 생성은 가짜 처리(registry)다."""
+"""작업 실행기와 작업 API (C-S2-04). 장면 저장 흐름은 test_generate_scenes.py가 본다."""
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.enums import FailureCode, JobStatus, JobType
+from app.core.enums import ElementType, FailureCode, JobStatus, JobType
 from app.jobs import runner, submit
 from app.jobs.context import JobError
-from app.jobs.registry import HANDLERS
+from app.jobs.handlers import scenes as scene_jobs
+from app.jobs.registry import HANDLERS, ON_SUCCESS
 from app.llm import client as llm_client
+from app.llm.schemas import Scene as LlmScene
+from app.llm.schemas import SceneCharacter, SceneSplitResult
 from app.main import app
 from app.repositories import jobs as job_repo
 from app.schemas.jobs import JobSummary
@@ -59,7 +62,32 @@ def _handler(monkeypatch, *outcomes: Exception | None) -> list[int]:
         return {}
 
     monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+    monkeypatch.setitem(ON_SUCCESS, JobType.GENERATE_SCENES, lambda db, job, result: None)
     return calls
+
+
+def _split_result(elements: list) -> SceneSplitResult:
+    names = [element.name for element in elements]
+    scenes = [
+        LlmScene(order=order, summary_ko=f"장면 {order}", element_names=names, image_prompt_en=f"prompt {order}")
+        for order in (1, 2, 3)
+    ]
+    characters = [
+        SceneCharacter(name=element.name, name_en="Grandmother", appearance_en="white hair")
+        for element in elements
+        if element.type == ElementType.PERSON
+    ]
+    return SceneSplitResult(scenes=scenes, characters=characters)
+
+
+def _patch_split(monkeypatch: pytest.MonkeyPatch) -> None:
+    """실제 핸들러가 네트워크와 이미지 생성을 타지 않게 한다."""
+
+    def fake(text, answers, elements, complete=None):
+        return _split_result(elements)
+
+    monkeypatch.setattr(scene_jobs, "split_scenes", fake)
+    monkeypatch.setattr(runner, "enqueue", lambda job_id, payload: None)
 
 
 def _interviewing_dream() -> int:
@@ -123,7 +151,8 @@ def test_concurrent_requests_return_one_job(hold_jobs, read_db):
     assert len(rows.jobs(read_db)) == 1
 
 
-def test_fake_job_goes_queued_running_succeeded(events, read_db):
+def test_fake_job_goes_queued_running_succeeded(events, read_db, monkeypatch):
+    _patch_split(monkeypatch)
     dream_id, _ = _ready_dream()
 
     res = _request(dream_id)
@@ -150,8 +179,7 @@ def test_fake_job_goes_queued_running_succeeded(events, read_db):
     assert job["error"] is None
     assert job["started_at"] is not None
     assert job["finished_at"] is not None
-    # 가짜 처리는 꿈 상태를 바꾸지 않는다 (C-S3-01에서 scenes_ready)
-    assert client.get(f"/dreams/{dream_id}").json()["status"] == "interviewing"
+    assert client.get(f"/dreams/{dream_id}").json()["status"] == "scenes_ready"
 
 
 def test_retryable_failure_then_success(monkeypatch):
@@ -358,7 +386,8 @@ def test_dream_active_job_is_latest_of_dream_jobs(session_factory: sessionmaker[
     assert active["type"] == "render_video"
 
 
-def test_dream_active_job_is_null_after_job_finishes():
+def test_dream_active_job_is_null_after_job_finishes(monkeypatch):
+    _patch_split(monkeypatch)
     dream_id, _ = _ready_dream()
     assert _job(_request(dream_id).json()["job_id"])["status"] == "succeeded"
 

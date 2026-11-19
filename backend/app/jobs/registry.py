@@ -1,23 +1,30 @@
 """작업 종류별 처리 함수와 후처리 등록."""
-import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.core.enums import JobStage, JobType
+from app.core.enums import JobType
 from app.jobs.context import JobContext
 from app.models.job import Job
 
+
+@dataclass(frozen=True)
+class FollowUp:
+    """성공 후처리가 돌려주는 다음 작업. 실행기가 commit한 뒤에 행을 만들고 실행한다."""
+
+    job_type: JobType
+    target_id: int | None
+    payload: dict
+
+
 Handler = Callable[[JobContext, dict], dict]
-SuccessHook = Callable[[Session, Job, dict], None]
+SuccessHook = Callable[[Session, Job, dict], list[FollowUp] | None]
 FailureHook = Callable[[Session, Job, str | None, str], None]
 
 HANDLERS: dict[JobType, Handler] = {}
 ON_SUCCESS: dict[JobType, SuccessHook] = {}
 ON_FAILURE: dict[JobType, FailureHook] = {}
-
-# 가짜 처리의 단계 사이 대기 (테스트에서 0으로 바꾼다)
-FAKE_STAGE_SECONDS = 0.5
 
 
 def register(job_type: JobType):
@@ -34,8 +41,9 @@ def get_handler(job_type: JobType | str) -> Handler | None:
 def on_success(job_type: JobType):
     """작업 종류당 성공 후처리 하나. 이미 있으면 서버가 뜨는 중(import)에 오류를 낸다.
 
-    fn(db, job, result) -> None. result는 핸들러 반환 dict.
+    fn(db, job, result) -> list[FollowUp] | None. result는 핸들러 반환 dict.
     실행기가 부를 때 작업은 아직 running이고, succeeded와 같은 트랜잭션에서 commit된다.
+    반환한 다음 작업은 commit 뒤에 등록하고 실행한다.
     """
     def deco(fn: SuccessHook) -> SuccessHook:
         key = JobType(job_type)
@@ -67,14 +75,3 @@ def get_on_success(job_type: JobType | str) -> SuccessHook | None:
 
 def get_on_failure(job_type: JobType | str) -> FailureHook | None:
     return ON_FAILURE.get(JobType(job_type))
-
-
-# TODO(C-S3-01): D의 split_scenes와 DB 담당 create_scenes로 실제 장면 생성 연결 (완료 시 scenes_ready)
-@register(JobType.GENERATE_SCENES)
-def fake_generate_scenes(ctx: JobContext, payload: dict) -> dict:
-    """단계만 보고하고 성공한다. 꿈 상태와 장면은 바꾸지 않는다."""
-    ctx.report_stage(JobStage.SPLITTING)
-    time.sleep(FAKE_STAGE_SECONDS)
-    ctx.report_stage(JobStage.PROMPTING)
-    time.sleep(FAKE_STAGE_SECONDS)
-    return {}

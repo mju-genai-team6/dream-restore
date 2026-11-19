@@ -5,6 +5,7 @@
 - JobError(retryable=True)는 settings.job_max_retries회까지 자동 재시도. CONTENT_POLICY는 바로 실패
 - JobError가 아닌 예외는 재시도 없이 실패. error_code는 NULL(API에서 INTERNAL_ERROR)
 - 성공 후처리(on_success)와 succeeded는 같은 세션에서 한 번에 commit한다. 후처리가 실패하면 핸들러는 다시 실행하지 않는다
+- 후처리가 돌려준 다음 작업은 commit 뒤에 행을 만들고 enqueue로 실행한다. 요청의 BackgroundTasks는 쓰지 않는다
 - on_failure는 최종 실패와 서버 시작 시 INTERRUPTED에서만 호출한다. 재시도 중간에는 호출하지 않는다
 - 실패 후처리가 예외를 내도 실행기는 멈추지 않는다. 작업은 그 전에 failed로 commit되어 있다
 - 시작 시 claim_job으로 queued를 running으로 한 번만 가져간다. 못 가져가면 핸들러·이벤트·후처리 없이 끝낸다
@@ -15,6 +16,7 @@
 """
 import logging
 import shutil
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 # 작업 함수 등록(@register). worker가 registry를 import하므로 registry가 아니라 여기서 불러온다
+import app.jobs.handlers.scenes  # noqa: F401
 import worker.image_gen.generate
 import worker.render.handler
 import worker.render.narration  # noqa: F401
@@ -30,7 +33,7 @@ from app.core.config import settings
 from app.core.enums import FailureCode, JobStage, JobStatus
 from app.db.session import SessionLocal
 from app.jobs.context import JobError
-from app.jobs.registry import get_handler, get_on_failure, get_on_success
+from app.jobs.registry import FollowUp, get_handler, get_on_failure, get_on_success
 from app.models import Job
 from app.repositories import jobs as job_repo
 from app.services import repo_bridge
@@ -92,6 +95,11 @@ def schedule(background_tasks: BackgroundTasks, job_id: int, payload: dict | Non
     background_tasks.add_task(run_job, job_id, payload or {})
 
 
+def enqueue(job_id: int, payload: dict | None = None) -> None:
+    """요청의 BackgroundTasks 없이 작업을 실행한다. commit된 뒤의 다음 작업에 쓴다."""
+    threading.Thread(target=run_job, args=(job_id, payload or {}), daemon=True).start()
+
+
 def run_job(job_id: int, payload: dict) -> None:
     with session_factory() as db:
         try:
@@ -146,18 +154,40 @@ def _fail(
     publish_job_event(job_summary(job))
 
 
+def _start_followups(dream_id: int, followups: list[FollowUp]) -> None:
+    """장면 저장이 commit된 뒤에 다음 작업 행을 만들고 실행한다."""
+    if not followups:
+        return
+    with session_factory() as db:
+        queued: list[tuple[int, dict]] = []
+        try:
+            for spec in followups:
+                child = job_repo.create_job_or_get_active(db, dream_id, spec.job_type, spec.target_id)
+                queued.append((child.id, spec.payload))
+            commit(db)
+        except Exception:
+            rollback(db)
+            raise
+    for child_id, payload in queued:
+        enqueue(child_id, payload)
+
+
 def _complete(db: Session, job_id: int, result: dict) -> None:
-    """성공 후처리와 succeeded를 한 트랜잭션으로 commit한 뒤 SSE를 보낸다."""
+    """성공 후처리와 succeeded를 한 트랜잭션으로 commit한 뒤, 다음 작업을 실행하고 SSE를 보낸다."""
     job = job_repo.get_job(db, job_id)
     if job is None:
         raise RuntimeError(f"작업 {job_id}이 없습니다.")
     hook = get_on_success(job.type)
-    if hook is not None:
-        hook(db, job, result)
+    followups = hook(db, job, result) if hook is not None else None
     job = job_repo.update_job(db, job_id, status=JobStatus.SUCCEEDED)
     if job is None:
         raise RuntimeError(f"작업 {job_id}이 없습니다.")
     commit(db)
+    try:
+        _start_followups(job.dream_id, followups or [])
+    except Exception:
+        # succeeded는 이미 commit됐다. 여기서 실패로 바꾸면 저장된 장면과 작업 상태가 어긋난다
+        logger.exception("작업 %s 후속 작업 등록 실패", job_id)
     publish_job_event(job_summary(job))
 
 

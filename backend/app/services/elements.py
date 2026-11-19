@@ -91,8 +91,8 @@ def _set_confidences(db: Session, dream_id: int, body: ConfidenceUpdate) -> Elem
         raise InvalidState("현재 단계에서는 확신도를 저장할 수 없습니다.", {"status": dream.status})
     if not _is_after_interview(extraction_repo.get_latest_extraction(db, dream_id)):
         raise InvalidState("요소 목록을 먼저 확인해 주세요.", {"status": dream.status})
-    # failed 작업은 막지 않는다. 확신도를 고친 뒤 다시 요청할 수 있다
-    # TODO(C-S3-01): 가짜 작업 성공 후에도 막히는지 확인 (scenes_ready로 바뀌면 위 상태 검사로 막힘)
+    # failed 작업은 막지 않는다. 확신도를 고친 뒤 다시 요청할 수 있다.
+    # succeeded는 scenes_ready가 되어 위의 상태 검사에서 막힌다
     scenes_job = next(
         (job for job in job_repo.get_active_jobs(db, dream_id) if job.type == JobType.GENERATE_SCENES),
         None,
