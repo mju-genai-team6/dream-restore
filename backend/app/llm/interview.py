@@ -2,7 +2,15 @@
 from pathlib import Path
 
 from app.core.config import settings
-from app.llm.client import Complete, SttError, call_json, get_openai_client, load_prompt
+from app.llm.client import (
+    Complete,
+    LlmTimeoutError,
+    SttEmptyResultError,
+    SttError,
+    call_json,
+    get_openai_client,
+    load_prompt,
+)
 from app.llm.schemas import ExtractionResult, InterviewAnswer, ReextractionResult
 
 NO_MEMORY = "(기억나지 않음)"
@@ -19,11 +27,13 @@ def transcribe(audio_path: str | Path) -> str:
     try:
         with path.open("rb") as f:
             result = client.audio.transcriptions.create(model=settings.stt_model, file=f, language="ko")
+    except openai.APITimeoutError as e:
+        raise LlmTimeoutError(f"음성 인식 시간 초과: {e}") from e
     except openai.OpenAIError as e:
         raise SttError(f"음성 인식 실패: {e}") from e
     text = (result.text or "").strip()
     if not text:
-        raise SttError("음성에서 인식된 내용이 없습니다.")
+        raise SttEmptyResultError("음성에서 인식된 내용이 없습니다.")
     return text
 
 

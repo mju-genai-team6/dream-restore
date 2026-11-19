@@ -80,13 +80,31 @@ class Scene(BaseModel):
     element_names: list[str] = Field(
         default_factory=list, description="이 장면에 나오는 요소 name. E1이 장면 확신도를 계산할 때 사용"
     )
-    image_prompt_en: str = Field(min_length=1, max_length=1000, description="이미지 생성 API에 넣을 영어 프롬프트")
+    image_prompt_en: str = Field(
+        min_length=1,
+        max_length=1000,
+        description="장면 내용만 담은 영어 프롬프트. 화풍과 인물 외형은 E2가 뒤에 붙이므로 넣지 않음",
+    )
+
+
+class SceneCharacter(BaseModel):
+    """꿈에 나온 인물의 영어 외형 묘사. 모든 장면에 같은 문구를 써서 인물 모습을 유지합니다 (E2).
+
+    E2 payload의 characters 항목 {"name", "appearance"}에 name_en, appearance_en을 넣으면 됩니다.
+    """
+
+    name: str = Field(min_length=1, description="인물 요소의 name (한국어, dream_elements.name과 같음)")
+    name_en: str = Field(min_length=1, max_length=50, description="image_prompt_en에서 이 인물을 부르는 영어 이름")
+    appearance_en: str = Field(
+        default="", max_length=300, description="사용자가 말한 외형만 영어로. 말한 것이 없으면 빈 문자열"
+    )
 
 
 class SceneSplitResult(BaseModel):
-    """split_scenes(...)의 결과: 장면 3~5개."""
+    """split_scenes(...)의 결과: 장면 3~5개와 인물 외형 목록."""
 
     scenes: list[Scene] = Field(min_length=3, max_length=5)
+    characters: list[SceneCharacter] = Field(default_factory=list)
 
     @field_validator("scenes")
     @classmethod
