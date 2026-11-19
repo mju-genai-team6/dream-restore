@@ -45,6 +45,8 @@ def test_hooks_reject_a_second_registration():
 
 
 def test_register_still_overwrites():
+    previous = HANDLERS.get(JobType.GENERATE_NARRATION)
+
     @register(JobType.GENERATE_NARRATION)
     def first(ctx, payload):
         return {}
@@ -56,4 +58,7 @@ def test_register_still_overwrites():
     try:
         assert get_handler(JobType.GENERATE_NARRATION) is second
     finally:
-        HANDLERS.pop(JobType.GENERATE_NARRATION, None)
+        if previous is None:
+            HANDLERS.pop(JobType.GENERATE_NARRATION, None)
+        else:
+            HANDLERS[JobType.GENERATE_NARRATION] = previous

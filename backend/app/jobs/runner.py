@@ -24,7 +24,8 @@ from sqlalchemy.orm import Session
 
 # 작업 함수 등록(@register). worker가 registry를 import하므로 registry가 아니라 여기서 불러온다
 import worker.image_gen.generate
-import worker.render.handler  # noqa: F401
+import worker.render.handler
+import worker.render.narration  # noqa: F401
 from app.core.config import settings
 from app.core.enums import FailureCode, JobStage, JobStatus
 from app.db.session import SessionLocal
