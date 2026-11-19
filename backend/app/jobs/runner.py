@@ -32,7 +32,6 @@ import app.jobs.handlers.images
 import app.jobs.handlers.scenes  # noqa: F401
 import worker.image_gen.generate
 import worker.render.handler
-import worker.render.narration  # noqa: F401
 from app.core.config import settings
 from app.core.enums import FailureCode, JobStage, JobStatus, JobType
 from app.db.session import SessionLocal
@@ -46,12 +45,19 @@ from app.services.job_views import job_summary
 from app.services.transactions import commit, rollback
 from app.storage import paths
 
+logger = logging.getLogger(__name__)
+
+# 나레이션(TTS)은 선택 기능이다. mutagen이 없으면 ImportError만 남기고 등록을 건너뛴다.
+# 서버는 계속 뜬다. 이미지 생성(worker.image_gen)과 렌더링(worker.render.handler)은 필수라 감싸지 않는다.
+try:
+    import worker.render.narration  # noqa: F401
+except ImportError as exc:
+    logger.error("나레이션(TTS) 핸들러를 등록하지 못함: %s", exc)
+
 INTERNAL_ERROR_MESSAGE = "처리 중 오류가 발생했습니다. 다시 시도해 주세요."
 
 # 테스트에서 테스트 DB 세션으로 바꿔 끼운다
 session_factory = SessionLocal
-
-logger = logging.getLogger(__name__)
 
 # 작업 종류별 실행기 재시도 횟수. 없으면 settings.job_max_retries.
 # generate_image는 E2가 안에서 최대 2회 재시도하므로, 실행기도 재시도하면 장면당 API 호출이 9번까지 늘어난다
