@@ -92,3 +92,21 @@
 - **추가 수집 항목**:
   - 너무 흐려서 내용을 알아보기 어려웠던 장면 유무
   - 한 장면 안에 확실한 요소와 흐릿한 요소가 섞여 있어 장면 전체 블러로 표현하기 아쉬웠던 사례 기록
+
+### 4.1 진행 절차 (`backend/scripts/e1_evaluation.py`)
+
+1. 참가자가 자기 꿈을 기록하고 확신도를 입력해 영상까지 만든다 (서비스 흐름 그대로).
+2. 비교 영상 만들기: `cd backend && python scripts/e1_evaluation.py pair --dream-id {꿈 id} --participant {번호}`
+   - `storage/eval/p{번호}_dream{id}/video_1.mp4`, `video_2.mp4`가 생긴다. 한쪽은 확신도 블러(`blur`), 한쪽은 원본(`no_blur`)이고 나머지 조건(장면·길이·효과)은 같다.
+   - 홀수 참가자는 `blur` 먼저, 짝수 참가자는 `no_blur` 먼저 (제시 순서 교차). 정답은 `key.json`에만 있고 참가자에게는 보여 주지 않는다.
+3. 두 영상을 순서대로 보여 주고, 영상마다 평가 문항(1~5점)과 "너무 흐려서 알아보기 어려웠는지", 의견을 받는다.
+4. 응답을 CSV로 모은다 (구글 폼·엑셀 CSV 그대로 가능, 헤더는 아래와 같아야 함).
+   ```
+   participant,dream_id,render_id,video,score,too_blurry,note
+   1,2,2,1,4,,
+   1,2,2,2,2,예,바다 장면이 너무 흐림
+   ```
+   - `video`는 1 또는 2, `too_blurry`는 `예`·`y`·`1`이면 해당
+5. 저장·집계: `python scripts/e1_evaluation.py import responses.csv`
+   - `evaluations`(`kind='confidence'`, `condition`=`blur`/`no_blur`)에 저장하고 조건별 평균·점수 분포·제시 순서별 평균·"너무 흐림" 응답·의견을 출력한다. 같은 응답을 다시 넣어도 중복 저장하지 않는다.
+   - DB 집계는 지표 뷰 `v_confidence_evaluation`로도 볼 수 있다.
