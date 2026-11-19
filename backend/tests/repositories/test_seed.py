@@ -90,3 +90,11 @@ def test_reset_refuses_non_local_db(monkeypatch):
     monkeypatch.setattr(reset_db.settings, "app_env", "production")
     with pytest.raises(SystemExit):
         reset_db._check_local("postgresql+psycopg://u:p@localhost:5432/dream")
+
+
+@pytest.mark.parametrize("status", [DreamStatus.SCENES_READY, DreamStatus.IMAGES_READY, DreamStatus.RENDERED])
+def test_samples_after_interview_have_all_confidences(db, seeded, status):
+    """실제 API는 모든 요소(감정 포함)에 확신도가 있어야 장면을 만든다. 샘플도 같아야 한다."""
+    elements = extractions.list_elements(db, seeded[status].id)
+    assert elements
+    assert [e.name for e in elements if e.confidence is None] == []

@@ -56,7 +56,9 @@ SAMPLE_DREAMS: list[dict] = [
             "우산을 받고 마음이 놓이면서 깼어요.",
         ],
         "after_extraction": _example("elements.json"),
-        "confidences": {"학교 복도": "high", "할머니": "high", "우산": "medium", "바다": "low"},
+        "confidences": {
+            "학교 복도": "high", "할머니": "high", "우산": "medium", "바다": "low", "두려움": "high", "안도감": "low",
+        },
         "scenes": _example("scenes.json")["scenes"],
         "scene_confidence": ["high", "high", "low"],
     },
@@ -88,7 +90,7 @@ SAMPLE_DREAMS: list[dict] = [
                 {"type": "emotion", "name": "초조함", "description": "늦어서 급했음"},
             ]
         },
-        "confidences": {"시험장": "high", "하얀 고양이": "medium", "감독관": "low"},
+        "confidences": {"시험장": "high", "하얀 고양이": "medium", "감독관": "low", "초조함": "high"},
         "scenes": [
             {"order": 1, "summary_ko": "늦게 시험장에 뛰어 들어간다.", "element_names": ["시험장", "초조함"], "image_prompt_en": "A sunlit classroom with rows of desks, someone rushing in late, dreamlike"},
             {"order": 2, "summary_ko": "책상 위에 파란 눈의 하얀 고양이가 앉아 있다.", "element_names": ["하얀 고양이", "시험장"], "image_prompt_en": "A white cat with blue eyes sitting on an exam desk, soft light, surreal"},
@@ -124,7 +126,7 @@ SAMPLE_DREAMS: list[dict] = [
                 {"type": "emotion", "name": "평온함", "description": "별을 보며 평온했음"},
             ]
         },
-        "confidences": {"밤기차": "high", "별": "high", "친구": "low", "터널": "medium"},
+        "confidences": {"밤기차": "high", "별": "high", "친구": "low", "터널": "medium", "평온함": "medium"},
         "scenes": [
             {"order": 1, "summary_ko": "불 꺼진 밤기차 창밖으로 별이 지나간다.", "element_names": ["밤기차", "별", "평온함"], "image_prompt_en": "A dark night train cabin, stars passing very close outside the window, calm dreamy mood"},
             {"order": 2, "summary_ko": "옆자리 친구가 말하지만 소리가 들리지 않는다.", "element_names": ["친구", "밤기차"], "image_prompt_en": "A friend talking silently in the next seat of a dim train, muted, dreamlike"},
