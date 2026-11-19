@@ -27,7 +27,7 @@ from app.jobs.handlers.images import fake_generate_image
 from app.jobs.registry import HANDLERS
 from app.llm import client as llm_client
 from app.llm.schemas import Scene as LlmScene
-from app.llm.schemas import SceneSplitResult
+from app.llm.schemas import SceneCharacter, SceneSplitResult
 from app.main import app
 from app.models import Dream, Scene, SceneVersion
 from app.repositories import dreams as dream_repo
@@ -63,7 +63,7 @@ def _confidence_for(element: dict) -> str:
     return "low" if element["type"] == ElementType.EMOTION else "high"
 
 
-def _scenes_ready(monkeypatch, scene_count: int = 3) -> int:
+def _scenes_ready(monkeypatch, scene_count: int = 3, characters: list[SceneCharacter] | None = None) -> int:
     """인터뷰·확신도·장면 생성까지 끝낸 꿈. 이미지 작업은 queued로 남는다(pending 픽스처 필요)."""
     dream_id = client.post("/dreams", json=TEXT).json()["dream_id"]
     questions = client.get(f"/dreams/{dream_id}/interview").json()["questions"]
@@ -83,7 +83,7 @@ def _scenes_ready(monkeypatch, scene_count: int = 3) -> int:
                 LlmScene(order=order, summary_ko=f"장면 {order}", element_names=names, image_prompt_en=f"prompt {order}")
                 for order in range(1, scene_count + 1)
             ],
-            characters=[],
+            characters=characters or [],
         )
 
     monkeypatch.setattr(scene_jobs, "split_scenes", split)
@@ -188,6 +188,38 @@ def test_failed_scene_keeps_scenes_ready_and_retry_api_regenerates_it(monkeypatc
     assert version.status == JobStatus.SUCCEEDED
     assert version.confidence_level == "high"
     assert _status(dream_id) == "images_ready"
+
+
+def test_retry_payload_keeps_saved_characters(monkeypatch, pending, read_db):
+    expected = [{"name": "Grandmother", "appearance": "white hair"}]
+    dream_id = _scenes_ready(
+        monkeypatch,
+        characters=[SceneCharacter(name="할머니", name_en="Grandmother", appearance_en="white hair")],
+    )
+    assert pending
+    assert all(payload["characters"] == expected for _, payload in pending)
+
+    versions = _versions(read_db)
+    failed_scene = versions[1].scene_id
+    monkeypatch.setitem(
+        HANDLERS, JobType.GENERATE_IMAGE, _fail_scene(failed_scene, JobError(FailureCode.CONTENT_POLICY, "정책 거부"))
+    )
+    for job_id, payload in pending:
+        runner.run_job(job_id, payload)
+
+    retried: list[dict] = []
+
+    def record(ctx, payload):
+        retried.append(dict(payload))
+        return fake_generate_image(ctx, payload)
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, record)
+    res = client.post(f"/dreams/{dream_id}/images/retry")
+
+    assert res.status_code == 202, res.text
+    assert retried == [
+        {"scene_id": failed_scene, "version_no": 1, "image_prompt_en": "prompt 2", "characters": expected}
+    ]
 
 
 def test_last_two_scenes_finishing_together_transition_once(monkeypatch, pending, read_db):

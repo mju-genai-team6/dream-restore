@@ -50,19 +50,17 @@ def retry_images(db: Session, dream_id: int, background_tasks: BackgroundTasks) 
             # DB에는 이미지가 없는데 파일만 남았으면(후처리 실패, commit 전 종료) E2가 덮어쓰기를 거절한다
             leftover = settings.storage_path / paths.scene_original(dream_id, scene.id, version.version_no)
             leftover.unlink(missing_ok=True)
-            # TODO(DB 담당): jobs.payload(JSONB)가 생기면 처음 payload의 characters로 다시 실행 (my-docs/requests.md)
-            logger.warning(
-                "장면 %s v%s 이미지를 characters 없이 다시 만듭니다. 인물 외형이 다른 장면과 다를 수 있습니다.",
-                scene.id,
-                version.version_no,
-            )
+            characters = scene_repo.list_scene_characters(db, version.id)
+            if characters is None:
+                logger.warning("장면 %s 버전 %s가 없어 이미지 작업을 다시 등록하지 않습니다.", scene.id, version.id)
+                continue
             job, _created = submit_job(
                 db,
                 background_tasks,
                 dream_id=dream_id,
                 job_type=JobType.GENERATE_IMAGE,
                 target_id=version.id,
-                payload=image_payload(scene.id, version.version_no, version.prompt_en, []),
+                payload=image_payload(scene.id, version.version_no, version.prompt_en, characters),
             )
             summaries.append(job_summary(job))
     return summaries

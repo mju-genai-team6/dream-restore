@@ -156,6 +156,34 @@ def test_success_saves_scenes_and_schedules_images(monkeypatch, read_db, image_c
     assert {call["version_no"] for call in image_calls} == {1}
     assert all(call["characters"] == [{"name": "Grandmother", "appearance": "white hair"}] for call in image_calls)
     assert all("confidence_style" not in call for call in image_calls)
+    people = [
+        element
+        for element in rows.elements_of(read_db, rows.extractions(read_db)[-1].id)
+        if element.type == ElementType.PERSON.value
+    ]
+    assert [(element.name, element.name_en, element.appearance_en) for element in people] == [
+        ("할머니", "Grandmother", "white hair")
+    ]
+
+
+def test_unknown_character_name_saves_scenes_without_appearance(monkeypatch, read_db, image_calls):
+    def fake(text, answers, elements, complete=None):
+        result = _split_result(elements)
+        result.characters.append(SceneCharacter(name="없는사람", name_en="nobody", appearance_en="tall"))
+        return result
+
+    monkeypatch.setattr(scene_jobs, "split_scenes", fake)
+    dream_id, _elements = _ready_dream()
+
+    job = _job(_request(dream_id).json()["job_id"])
+
+    assert job["status"] == "succeeded"
+    assert len(_stored_scenes(read_db)) == 3
+    stored = rows.elements_of(read_db, rows.extractions(read_db)[-1].id)
+    assert stored
+    assert all(element.name_en is None and element.appearance_en == "" for element in stored)
+    assert image_calls
+    assert all(call["characters"] == [] for call in image_calls)
 
 
 def test_unknown_element_name_fails_and_can_retry(monkeypatch, read_db):
