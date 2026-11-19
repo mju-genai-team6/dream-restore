@@ -1,5 +1,6 @@
 from functools import cached_property
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     stt_model: str = "whisper-1"
     llm_timeout_seconds: int = 60
 
+    # fake: 이미지 API 대신 단색 PNG를 저장한다. real일 때만 E2 핸들러가 실제 이미지 API를 부른다
+    image_generation_mode: Literal["fake", "real"] = "fake"
     image_max_concurrency: int = 3
     job_timeout_seconds: int = 300
     job_max_retries: int = 2  # JobError(retryable=True)일 때 자동 재시도 횟수

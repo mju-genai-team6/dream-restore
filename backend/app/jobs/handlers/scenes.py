@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.enums import DreamStatus, FailureCode, JobStage, JobType
 from app.core.errors import InvalidState
 from app.jobs.context import JobContext, JobError
+from app.jobs.handlers.images import image_payload
 from app.jobs.registry import FollowUp, on_success, register
 from app.llm.client import LlmCallError, LlmSchemaError, LlmTimeoutError
 from app.llm.scenes import split_scenes
@@ -53,7 +54,8 @@ def _ids_by_name(elements: list[dict]) -> dict[str, int]:
 def save_scenes(db: Session, job: Job, result: dict) -> list[FollowUp]:
     """장면을 저장하고 interviewing을 scenes_ready로 바꾼 뒤, 버전마다 이미지 작업 명세를 돌려준다.
 
-    실행기가 이 함수 뒤에 succeeded와 함께 commit한다. 여기서 commit하지 않고 작업도 넣지 않는다.
+    실행기가 이 함수 뒤에 이미지 작업 행(queued)을 만들고 succeeded와 함께 commit한다.
+    여기서 commit하지 않고 작업도 넣지 않는다.
     """
     ids_by_name = _ids_by_name(result["elements"])
     scenes = [{key: value for key, value in item.items() if key != "confidence_level"} for item in result["scenes"]]
@@ -93,12 +95,7 @@ def save_scenes(db: Session, job: Job, result: dict) -> list[FollowUp]:
             FollowUp(
                 job_type=JobType.GENERATE_IMAGE,
                 target_id=version.id,
-                payload={
-                    "scene_id": scene.id,
-                    "version_no": version.version_no,
-                    "image_prompt_en": item["image_prompt_en"],
-                    "characters": characters,
-                },
+                payload=image_payload(scene.id, version.version_no, item["image_prompt_en"], characters),
             )
         )
     return followups

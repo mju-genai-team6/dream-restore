@@ -1043,6 +1043,90 @@
         }
       }
     },
+    "/dreams/{dream_id}/images/retry": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "이미지가 없는 장면의 이미지 다시 생성 (scenes_ready일 때, 진행 중이면 기존 작업 반환)",
+        "operationId": "retry_images_dreams__dream_id__images_retry_post",
+        "parameters": [
+          {
+            "name": "dream_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Dream Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobSummary"
+                  },
+                  "title": "Response Retry Images Dreams  Dream Id  Images Retry Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "꿈 기록을 찾을 수 없습니다.",
+                    "detail": {
+                      "dream_id": 999
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "현재 상태에서 허용되지 않은 요청",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "INVALID_STATE",
+                    "message": "현재 단계에서는 할 수 없는 요청입니다.",
+                    "detail": {
+                      "status": "interviewing"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/{job_id}": {
       "get": {
         "tags": [

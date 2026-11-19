@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -11,10 +12,16 @@ from app.api import router as api_router
 from app.core.config import settings
 from app.core.errors import AudioTooLarge, error_body, register_error_handlers
 from app.jobs import runner
+from app.jobs.handlers.images import install_image_handler
+
+# uvicorn이 핸들러를 붙여 둔 로거. app 로거의 INFO는 로깅 설정이 없어 출력되지 않는다
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    install_image_handler(settings.image_generation_mode)
+    logger.info("이미지 생성 모드: %s", settings.image_generation_mode)
     # 재시작 전 BackgroundTasks의 작업은 사라졌으므로 running·queued로 남은 작업을 실패 처리한다
     runner.recover_interrupted()
     yield

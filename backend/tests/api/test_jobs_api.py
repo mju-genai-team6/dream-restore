@@ -9,6 +9,7 @@ from app.core.enums import ElementType, FailureCode, JobStatus, JobType
 from app.jobs import runner, submit
 from app.jobs.context import JobError
 from app.jobs.handlers import scenes as scene_jobs
+from app.jobs.handlers.images import install_image_handler
 from app.jobs.registry import HANDLERS, ON_SUCCESS
 from app.llm import client as llm_client
 from app.llm.schemas import Scene as LlmScene
@@ -395,6 +396,8 @@ def test_dream_active_job_is_null_after_job_finishes(monkeypatch):
 
 
 def test_worker_handlers_stay_registered():
+    """generate_image는 conftest가 가짜 핸들러로 고정한다. real 모드에서 E2 핸들러로 바뀌는지만 본다."""
     assert HANDLERS[JobType.RENDER_VIDEO] is handle_render_video
-    assert HANDLERS[JobType.GENERATE_IMAGE] is handle_generate_image
     assert JobType.GENERATE_SCENES in HANDLERS
+    assert install_image_handler("real") is handle_generate_image
+    assert HANDLERS[JobType.GENERATE_IMAGE] is handle_generate_image

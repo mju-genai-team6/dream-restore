@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.enums import DreamStatus, ElementType, JobType
 from app.jobs import runner
 from app.jobs.handlers import scenes as scene_jobs
+from app.jobs.handlers.images import fake_generate_image
 from app.jobs.registry import HANDLERS
 from app.llm import client as llm_client
 from app.llm.client import LlmCallError, LlmSchemaError, LlmTimeoutError
@@ -32,7 +33,7 @@ def llm(monkeypatch) -> FakeLlm:
 
 @pytest.fixture(autouse=True)
 def image_calls(monkeypatch) -> list[dict]:
-    """E2 핸들러 대신 끼워, 이미지 API를 부르지 않고 commit 뒤 실행만 확인한다."""
+    """가짜 이미지 핸들러 앞에서 payload를 기록하고, commit 뒤에 실행되는지 확인한다."""
     calls: list[dict] = []
 
     def fake(ctx, payload):
@@ -47,7 +48,7 @@ def image_calls(monkeypatch) -> list[dict]:
             assert version is not None
             assert version.version_no == payload["version_no"]
         calls.append(dict(payload))
-        return {}
+        return fake_generate_image(ctx, payload)
 
     monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, fake)
     monkeypatch.setattr(runner, "enqueue", runner.run_job)
@@ -130,7 +131,8 @@ def test_success_saves_scenes_and_schedules_images(monkeypatch, read_db, image_c
     assert seen["answers"][0] == ("복도에서 기억나는 것을 자유롭게 말해 주세요.", "분홍색 카디건을 입었어요")
     assert all(answer is None for _, answer in seen["answers"][1:])
     assert seen["confidences"] == [item["name"] for item in elements]
-    assert client.get(f"/dreams/{dream_id}").json()["status"] == "scenes_ready"
+    # 이미지 작업도 바로 실행되어(enqueue = run_job) 세 장면 모두 끝났다
+    assert client.get(f"/dreams/{dream_id}").json()["status"] == "images_ready"
 
     stored = _stored_scenes(read_db)
     assert [scene.order for scene in stored] == [1, 2, 3]
@@ -143,9 +145,7 @@ def test_success_saves_scenes_and_schedules_images(monkeypatch, read_db, image_c
         assert version.summary_ko == f"장면 {scene.order}"
         assert version.prompt_en == f"prompt {scene.order}"
         assert [int(element_id) for element_id in version.element_ids] == expected_ids
-        assert version.confidence_level is None
-        assert version.image_path is None
-        assert version.final_prompt is None
+        assert version.image_path == f"dreams/{dream_id}/scenes/{scene.id}/v1/original.png"
 
     image_jobs = [row for row in rows.jobs(read_db) if row.type == JobType.GENERATE_IMAGE.value]
     assert len(image_jobs) == 3
@@ -257,4 +257,48 @@ def test_confidence_rejected_after_scenes_ready(monkeypatch):
 
     assert res.status_code == 409
     assert res.json()["error"]["code"] == "INVALID_STATE"
-    assert res.json()["error"]["detail"] == {"status": "scenes_ready"}
+    assert res.json()["error"]["detail"] == {"status": "images_ready"}
+
+
+def test_image_jobs_are_committed_with_scenes(monkeypatch, read_db, image_calls):
+    """장면 저장 commit 직후 서버가 꺼져 실행이 안 되어도, 이미지 작업 행은 queued로 남는다."""
+    started: list[int] = []
+    monkeypatch.setattr(runner, "enqueue", lambda job_id, payload=None: started.append(job_id))
+    monkeypatch.setattr(
+        scene_jobs, "split_scenes", lambda text, answers, elements, complete=None: _split_result(elements)
+    )
+    dream_id, _ = _ready_dream()
+
+    assert _job(_request(dream_id).json()["job_id"])["status"] == "succeeded"
+
+    image_jobs = [row for row in rows.jobs(read_db) if row.type == JobType.GENERATE_IMAGE.value]
+    assert len(image_jobs) == 3
+    assert all(row.status == "queued" for row in image_jobs)
+    assert sorted(started) == sorted(row.id for row in image_jobs)
+    assert image_calls == []
+    assert client.get(f"/dreams/{dream_id}").json()["status"] == "scenes_ready"
+
+
+def test_image_job_row_failure_rolls_back_scenes(monkeypatch, read_db, image_calls):
+    """이미지 작업 행을 만들지 못하면 장면 저장과 상태 변경도 함께 되돌린다."""
+    original = runner.job_repo.create_job_or_get_active
+
+    def create(db, dream_id, type_, target_id=None):
+        if type_ == JobType.GENERATE_IMAGE:
+            raise RuntimeError("작업 행 생성 실패")
+        return original(db, dream_id, type_, target_id)
+
+    monkeypatch.setattr(runner.job_repo, "create_job_or_get_active", create)
+    monkeypatch.setattr(
+        scene_jobs, "split_scenes", lambda text, answers, elements, complete=None: _split_result(elements)
+    )
+    dream_id, _ = _ready_dream()
+
+    job = _job(_request(dream_id).json()["job_id"])
+
+    assert job["status"] == "failed"
+    assert job["error"]["code"] == "INTERNAL_ERROR"
+    assert _stored_scenes(read_db) == []
+    assert [row.type for row in rows.jobs(read_db)] == [JobType.GENERATE_SCENES.value]
+    assert image_calls == []
+    assert client.get(f"/dreams/{dream_id}").json()["status"] == "interviewing"

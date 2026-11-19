@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.common import error_responses
 from app.schemas.jobs import JobCreate, JobSummary
+from app.services import images as image_service
 from app.services import jobs as job_service
 
 router = APIRouter(prefix="", tags=["jobs"])
@@ -26,6 +27,21 @@ def create_job(
     db: Annotated[Session, Depends(get_db)],
 ) -> JobSummary:
     return job_service.create_job(db, dream_id, body, background_tasks)
+
+
+@router.post(
+    "/dreams/{dream_id}/images/retry",
+    response_model=list[JobSummary],
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="이미지가 없는 장면의 이미지 다시 생성 (scenes_ready일 때, 진행 중이면 기존 작업 반환)",
+    responses=error_responses(404, 409),
+)
+def retry_images(
+    dream_id: int,
+    background_tasks: BackgroundTasks,
+    db: Annotated[Session, Depends(get_db)],
+) -> list[JobSummary]:
+    return image_service.retry_images(db, dream_id, background_tasks)
 
 
 @router.get(

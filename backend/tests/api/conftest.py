@@ -7,6 +7,7 @@
   API 호출 뒤 다시 확인할 때는 `read_db.expire_all()`을 먼저 부른다.
 """
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -14,8 +15,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
+from app.core.enums import JobType
 from app.db.session import get_db
 from app.jobs import runner
+from app.jobs.handlers.images import fake_generate_image
+from app.jobs.registry import HANDLERS
 from app.main import app
 
 # 나머지 테이블은 모두 dreams나 world_entities에 딸려 있어 CASCADE로 함께 비워진다
@@ -33,6 +37,23 @@ def _truncate(engine: Engine) -> None:
 def session_factory(db_engine: Engine) -> sessionmaker[Session]:
     """앱(app/db/session.py)과 같은 설정의 세션. `with session_factory.begin() as s:`는 끝에서 commit한다."""
     return sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False)
+
+
+@pytest.fixture(autouse=True)
+def no_real_image_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """.env에 키가 있어도 pytest가 실제 이미지 API를 부르지 않게 한다.
+
+    키를 비우고 이미지 생성 모드를 fake로 고정한 뒤 generate_image에 가짜 핸들러를 끼운다.
+    setitem이라 lifespan(install_image_handler)이 바꾼 핸들러도 테스트가 끝나면 되돌아간다.
+    가짜 핸들러가 쓰는 파일은 테스트별 임시 폴더에 둔다.
+    """
+    for name in ("OPENAI_API_KEY", "IMAGE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "image_api_key", "")
+    monkeypatch.setattr(settings, "image_generation_mode", "fake")
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, fake_generate_image)
+    monkeypatch.setattr(settings, "storage_path", tmp_path)  # cached_property라 값을 직접 바꾼다
 
 
 @pytest.fixture(autouse=True)

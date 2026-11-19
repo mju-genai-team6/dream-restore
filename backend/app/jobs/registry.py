@@ -11,7 +11,7 @@ from app.models.job import Job
 
 @dataclass(frozen=True)
 class FollowUp:
-    """성공 후처리가 돌려주는 다음 작업. 실행기가 commit한 뒤에 행을 만들고 실행한다."""
+    """성공 후처리가 돌려주는 다음 작업. 실행기가 같은 트랜잭션에서 queued 행을 만들고, commit 뒤에 실행한다."""
 
     job_type: JobType
     target_id: int | None
@@ -43,7 +43,7 @@ def on_success(job_type: JobType):
 
     fn(db, job, result) -> list[FollowUp] | None. result는 핸들러 반환 dict.
     실행기가 부를 때 작업은 아직 running이고, succeeded와 같은 트랜잭션에서 commit된다.
-    반환한 다음 작업은 commit 뒤에 등록하고 실행한다.
+    반환한 다음 작업은 같은 트랜잭션에서 queued 행으로 만들고, commit 뒤에 실행한다.
     """
     def deco(fn: SuccessHook) -> SuccessHook:
         key = JobType(job_type)
