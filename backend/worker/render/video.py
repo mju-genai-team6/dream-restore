@@ -205,7 +205,8 @@ def probe_media_duration(
         proc = subprocess.run(
             [exe, "-hide_banner", "-i", str(path)],
             capture_output=True,
-            text=True,
+            encoding="utf-8",  # Windows 기본 인코딩(cp949)으로 FFmpeg 출력을 읽으면 깨진다
+            errors="replace",
             timeout=timeout,
             check=False,
         )
@@ -450,7 +451,8 @@ def verify_rendered_video(
                 "-",
             ],
             capture_output=True,
-            text=True,
+            encoding="utf-8",  # Windows 기본 인코딩(cp949)으로 FFmpeg 출력을 읽으면 깨진다
+            errors="replace",
             timeout=timeout,
             check=False,
         )
@@ -579,7 +581,8 @@ def compose_slideshow_video(
         proc = subprocess.run(
             cmd,
             capture_output=True,
-            text=True,
+            encoding="utf-8",  # Windows 기본 인코딩(cp949)으로 FFmpeg 출력을 읽으면 깨진다
+            errors="replace",
             timeout=timeout,
             check=False,
         )

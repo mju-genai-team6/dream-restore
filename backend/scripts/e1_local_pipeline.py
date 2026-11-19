@@ -90,7 +90,7 @@ class FakeImagesAPI:
 
 def load_scenes() -> list[dict]:
     """목업 API의 장면(id·확신도)에 D 예시의 영어 프롬프트를 순서대로 붙인다."""
-    prompts = {s["order"]: s["image_prompt_en"] for s in json.loads(EXAMPLE_SCENES.read_text())["scenes"]}
+    prompts = {s["order"]: s["image_prompt_en"] for s in json.loads(EXAMPLE_SCENES.read_text(encoding="utf-8"))["scenes"]}
     return [{**s, "image_prompt_en": prompts[s["order"]]} for s in mock_data.SCENES["scenes"]]
 
 

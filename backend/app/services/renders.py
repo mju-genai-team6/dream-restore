@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.enums import DreamStatus, ElementType, JobStatus, JobType
+from app.core.enums import DreamStatus, ElementType, JobType
 from app.core.errors import InvalidState, NotFound
 from app.jobs.registry import on_failure, on_success
 from app.jobs.submit import submit_job
@@ -146,8 +146,5 @@ def save_render(db: Session, job: Job, result: dict) -> None:
 
 @on_failure(JobType.RENDER_VIDEO)
 def mark_render_failed(db: Session, job: Job, error_code: str | None, error_message: str) -> None:
-    # shortcut: repositories에 렌더 실패 함수가 없어 여기서 바꾼다. DB 담당 함수가 생기면 교체
-    render = db.get(Render, job.target_id) if job.target_id else None
-    if render is not None and render.status != JobStatus.SUCCEEDED.value:
-        render.status = JobStatus.FAILED.value
-        db.flush()
+    if job.target_id:
+        render_repo.fail_render(db, job.target_id)

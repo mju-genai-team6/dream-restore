@@ -1,11 +1,11 @@
 """요소 추출 결과와 요소 (extractions, dream_elements)."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import Confidence, ExtractionPhase
+from app.core.enums import Confidence, ElementType, ExtractionPhase
 from app.models import DreamElement, Extraction
 from app.repositories import InvalidData
 
@@ -89,3 +89,29 @@ def set_confidences(db: Session, dream_id: int, confidences: Mapping[int, Confid
         elements[element_id].confidence = str(value)
     db.flush()
     return [elements[element_id] for element_id in sorted(confidences)]
+
+
+def set_character_appearances(db: Session, dream_id: int, characters: Sequence[Mapping]) -> list[DreamElement]:
+    """인물 요소에 이미지용 영어 이름·외형을 저장한다 (C 요청, 장면 생성 성공 후 호출).
+
+    characters: D의 SceneSplitResult.characters를 model_dump()한 dict 목록
+                ({"name", "name_en", "appearance_en"}). name은 이 꿈의 최신 인물 요소 이름.
+    하나라도 틀리면(이 꿈의 인물 요소가 아니거나 name_en이 비어 있음) InvalidData를 던지고 아무것도 바꾸지 않는다.
+    다시 부르면 덮어쓴다 (장면을 다시 분할한 경우).
+    """
+    people = {e.name: e for e in list_elements(db, dream_id) if e.type == ElementType.PERSON.value}
+    unknown = sorted({str(c.get("name", "")) for c in characters} - set(people))
+    if unknown:
+        raise InvalidData("이 꿈 기록의 인물 요소가 아닙니다.", {"names": unknown})
+    empty = sorted(str(c["name"]) for c in characters if not str(c.get("name_en") or "").strip())
+    if empty:
+        raise InvalidData("name_en이 비어 있습니다.", {"names": empty})
+
+    updated = []
+    for c in characters:
+        element = people[str(c["name"])]
+        element.name_en = str(c["name_en"]).strip()
+        element.appearance_en = str(c.get("appearance_en") or "").strip()
+        updated.append(element)
+    db.flush()
+    return updated
