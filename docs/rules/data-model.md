@@ -2,7 +2,7 @@
 
 담당: C2 · 코드 원본: `backend/app/models/` · 마이그레이션: `backend/alembic/versions/`
 
-C 계획서 3.3과 DB 이관 문서 2장을 기준으로 한 12개 테이블입니다. 두 문서에 없는 컬럼은 팀원 요청이 있을 때만 추가합니다(지금까지: `scene_versions.generated_at` — E2 요청). 컬럼이 필요하면 단톡방이나 이슈로 C2에게 요청해 주세요. 마이그레이션 파일은 C2만 만듭니다.
+C 계획서 3.3과 DB 이관 문서 2장을 기준으로 한 12개 테이블입니다. 두 문서에 없는 컬럼은 팀원 요청이 있을 때만 추가합니다(지금까지: `scene_versions.generated_at` — E2 요청, `dream_elements.name_en`·`appearance_en` — C 요청). 컬럼이 필요하면 단톡방이나 이슈로 C2에게 요청해 주세요. 마이그레이션 파일은 C2만 만듭니다.
 
 ## ERD
 
@@ -93,6 +93,8 @@ erDiagram
 | description | text | 꿈 속 묘사, 없으면 빈 문자열 |
 | confidence | text, NULL | `high`, `medium`, `low`. **사용자 입력만 저장**, 입력 전에는 NULL |
 | entity_id | FK world_entities, NULL | (선택) 세계관 인물·장소 연결 |
+| name_en | text, NULL | 인물 요소의 이미지용 영어 이름 (C 요청, D 장면 분할 `characters`에서 채움) |
+| appearance_en | text, 기본값 `''` | 인물 요소의 이미지용 영어 외형. 처음 생성·재시도·장면 수정이 모두 여기서 읽어 같은 인물은 같은 문구로 그림 |
 
 꿈의 요소 목록은 **가장 최근 `extraction_id`의 요소만** 사용합니다 (`list_elements`, `get_latest_extraction`). 재추출하면 이전 추출의 요소는 지표용으로만 남습니다.
 
