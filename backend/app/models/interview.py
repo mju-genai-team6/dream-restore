@@ -44,6 +44,10 @@ class DreamElement(IdMixin, TimestampMixin, Base):
     entity_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("world_entities.id", ondelete="SET NULL"), index=True
     )
+    # 인물(person) 요소의 이미지용 영어 이름·외형 (C 요청). D 장면 분할 결과의 characters에서 채운다.
+    # 처음 생성·재시도·장면 수정이 모두 여기서 읽어 같은 인물은 같은 문구로 그린다 (E2 인물 일관성)
+    name_en: Mapped[str | None] = mapped_column(String(50))
+    appearance_en: Mapped[str] = mapped_column(Text, server_default="")
 
 
 class InterviewQuestion(IdMixin, TimestampMixin, Base):

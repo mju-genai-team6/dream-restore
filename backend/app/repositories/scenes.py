@@ -5,8 +5,8 @@ from collections.abc import Mapping, Sequence
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.enums import JobStatus
-from app.models import Scene, SceneVersion
+from app.core.enums import ElementType, JobStatus
+from app.models import DreamElement, Scene, SceneVersion
 from app.repositories import InvalidData
 from app.repositories.extractions import list_elements
 
@@ -89,6 +89,32 @@ def set_current_version(db: Session, scene_id: int, version_id: int) -> Scene | 
 
 def get_scene_version(db: Session, scene_version_id: int) -> SceneVersion | None:
     return db.get(SceneVersion, scene_version_id)
+
+
+def list_scene_characters(db: Session, scene_version_id: int) -> list[dict] | None:
+    """장면 버전에 나오는 인물을 E2 generate_image payload의 characters 형식으로 돌려준다 (C 요청).
+
+    [{"name": name_en, "appearance": appearance_en}, ...] — 장면의 element_ids 순서.
+    인물(person) 요소 중 name_en이 저장된 것만 (set_character_appearances 전이면 빈 목록).
+    장면 버전이 없으면 None.
+    """
+    version = db.get(SceneVersion, scene_version_id)
+    if version is None:
+        return None
+    ids = list(version.element_ids or [])
+    if not ids:
+        return []
+    people = {
+        e.id: e
+        for e in db.scalars(
+            select(DreamElement).where(
+                DreamElement.id.in_(ids),
+                DreamElement.type == ElementType.PERSON.value,
+                DreamElement.name_en.is_not(None),
+            )
+        )
+    }
+    return [{"name": people[i].name_en, "appearance": people[i].appearance_en} for i in ids if i in people]
 
 
 def list_scenes(db: Session, dream_id: int) -> list[Scene]:
