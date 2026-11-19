@@ -227,43 +227,67 @@ JOB_EVENTS = [
     {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "succeeded", "stage": "prompting"},
 ]
 
+# 장면 이미지 주소 끝의 ?v=는 generated_at(초 단위 타임스탬프). 2026-11-14T09:02:00+09:00
+IMAGE_VERSION = 1794528120
+
 SCENES = {
     "scenes": [
         {
             "scene_id": 1,
             "order": 1,
             "summary_ko": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
-            "image_url": _image_url(1),
+            "image_url": f"{_image_url(1)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"name": "학교 복도", "type": "place", "confidence": "high"},
-                {"name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
             ],
+            "status": "succeeded",
+            "confidence_level": "high",
+            "active_job": None,
         },
         {
             "scene_id": 2,
             "order": 2,
             "summary_ko": "분홍색 카디건을 입은 할머니가 나타나 노란 우산을 건넨다.",
-            "image_url": _image_url(2),
+            "image_url": f"{_image_url(2)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"name": "학교 복도", "type": "place", "confidence": "high"},
-                {"name": "할머니", "type": "person", "confidence": "medium"},
-                {"name": "우산", "type": "object", "confidence": "high"},
-                {"name": "안도감", "type": "emotion", "confidence": "low"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
+                {"element_id": 2, "name": "할머니", "type": "person", "confidence": "medium"},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
+                {"element_id": 6, "name": "안도감", "type": "emotion", "confidence": "low"},
             ],
+            "status": "succeeded",
+            "confidence_level": "high",
+            "active_job": None,
         },
         {
             "scene_id": 3,
             "order": 3,
             "summary_ko": "창밖을 보니 학교 밖이 높은 파도가 치는 회색 바다다.",
-            "image_url": _image_url(3),
+            "image_url": None,
             "version_no": 1,
             "elements": [
-                {"name": "바다", "type": "place", "confidence": "low"},
-                {"name": "우산", "type": "object", "confidence": "high"},
-                {"name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 4, "name": "바다", "type": "place", "confidence": "low"},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
             ],
+            "status": "running",
+            "confidence_level": None,
+            "active_job": {
+                "job_id": 4,
+                "dream_id": DREAM_ID,
+                "type": "generate_image",
+                "target_id": 3,
+                "status": "running",
+                "stage": "requesting",
+                "attempt": 1,
+                "error": None,
+                "created_at": CREATED_AT,
+                "started_at": UPDATED_AT,
+                "finished_at": None,
+            },
         },
     ]
 }
