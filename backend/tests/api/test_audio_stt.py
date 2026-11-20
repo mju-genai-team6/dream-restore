@@ -79,6 +79,7 @@ def test_reupload_after_confirm_clears_confirmed_text(monkeypatch):
     ("mode", "status_code", "code"),
     [
         ("stt_error", 502, "STT_FAILED"),
+        ("empty", 502, "STT_FAILED"),
         ("no_key", 502, "STT_FAILED"),
         ("timeout", 504, "UPSTREAM_TIMEOUT"),
     ],

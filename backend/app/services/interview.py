@@ -48,6 +48,7 @@ def _interview_response(rows: list[InterviewQuestion]) -> InterviewResponse:
             question=row.text,
             answered=_is_answered(row),
             skipped=row.skipped,
+            answer=row.answer,
         )
         for row in rows
     ]

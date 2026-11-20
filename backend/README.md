@@ -8,7 +8,10 @@ app/                FastAPI 서버
   db/  models/      DB 연결, 테이블
   schemas/          API 요청/응답 스키마
   services/         비즈니스 로직, 상태 전이
-  jobs/             작업 실행기, 작업 함수 규격(context), 등록(registry), 작업 등록(submit)
+    repo_bridge.py  DB 담당 반영 전 임시 함수 (repositories에 들어오면 교체 후 삭제)
+  jobs/             작업 실행기, 작업 함수 규격(context), 등록(registry)
+    submit.py       작업 등록 (진행 중인 같은 작업이 있으면 그 작업을 돌려줌)
+    handlers/       장면 생성·이미지 작업 함수와 후처리
   storage/          파일 경로 규칙
   llm/              인터뷰·장면 모듈
 worker/
@@ -19,6 +22,22 @@ alembic/            DB 마이그레이션
 scripts/            OpenAPI 내보내기
 tests/              pytest
 ```
+
+## 이미지 생성 모드
+
+장면 이미지는 저장소 루트 `.env`의 `IMAGE_GENERATION_MODE`에 따라 만든다.
+
+| 값 | 동작 |
+| --- | --- |
+| `fake` (기본) | 이미지 API를 부르지 않아 비용이 없다. 장면마다 색이 다른 단색 PNG에 "FAKE IMAGE"와 꿈·장면 순서·버전을 적어 저장한다 |
+| `real` | 실제 이미지 API를 부른다(`OPENAI_API_KEY` 필요, 비용 발생). 장면 하나당 최대 3번 호출한다(처음 1번 + 실패 시 재시도 2번) |
+
+바꾸는 방법:
+
+1. `.env`에서 `IMAGE_GENERATION_MODE=real`(또는 `fake`)로 고친다.
+2. 서버를 다시 시작한다. 모드는 서버가 시작될 때 한 번만 읽으며, 시작 로그에 `이미지 생성 모드: real`처럼 찍힌다.
+
+**실제 API로 확인을 마치면 반드시 `fake`로 되돌리고 서버를 다시 시작한다.** `real`로 둔 채 개발하면 장면을 만들 때마다 비용이 나간다. pytest는 `.env` 값과 관계없이 항상 `fake`로 돈다.
 
 ## 작업 후처리 등록
 

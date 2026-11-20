@@ -7,15 +7,21 @@
   API 호출 뒤 다시 확인할 때는 `read_db.expire_all()`을 먼저 부른다.
 """
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.routing import Mount
+from starlette.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.core.enums import JobType
 from app.db.session import get_db
-from app.jobs import registry, runner
+from app.jobs import runner
+from app.jobs.handlers.images import fake_generate_image
+from app.jobs.registry import HANDLERS
 from app.main import app
 
 # 나머지 테이블은 모두 dreams나 world_entities에 딸려 있어 CASCADE로 함께 비워진다
@@ -36,6 +42,31 @@ def session_factory(db_engine: Engine) -> sessionmaker[Session]:
 
 
 @pytest.fixture(autouse=True)
+def no_real_image_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """.env에 키가 있어도 pytest가 실제 이미지 API를 부르지 않게 한다.
+
+    키를 비우고 이미지 생성 모드를 fake로 고정한 뒤 generate_image에 가짜 핸들러를 끼운다.
+    setitem이라 lifespan(install_image_handler)이 바꾼 핸들러도 테스트가 끝나면 되돌아간다.
+    가짜 핸들러가 쓰는 파일은 테스트별 임시 폴더에 둔다. /storage 마운트는 import 때 경로로 고정되므로
+    같은 임시 폴더를 보도록 함께 바꾼다.
+    """
+    for name in ("OPENAI_API_KEY", "IMAGE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "image_api_key", "")
+    monkeypatch.setattr(settings, "image_generation_mode", "fake")
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, fake_generate_image)
+    monkeypatch.setattr(settings, "storage_path", tmp_path)  # cached_property라 값을 직접 바꾼다
+    static = _storage_files()
+    monkeypatch.setattr(static, "directory", tmp_path)
+    monkeypatch.setattr(static, "all_directories", [tmp_path])
+
+
+def _storage_files() -> StaticFiles:
+    return next(route.app for route in app.routes if isinstance(route, Mount) and route.name == "storage")
+
+
+@pytest.fixture(autouse=True)
 def api_db(
     db_engine: Engine, session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
@@ -45,7 +76,6 @@ def api_db(
     작업 실행기와 서버 시작 처리(lifespan)도 같은 테스트 DB 세션을 쓰고, 대기 시간은 0으로 둔다.
     """
     monkeypatch.setattr(runner, "session_factory", session_factory)
-    monkeypatch.setattr(registry, "FAKE_STAGE_SECONDS", 0)
     monkeypatch.setattr(settings, "job_retry_delay_seconds", 0)
     _truncate(db_engine)
 

@@ -2,19 +2,24 @@
 
 - 작업 상태는 jobs 테이블에 저장한다. 요청 세션은 응답 뒤 닫히므로 작업마다 새 세션을 연다.
 - 같은 꿈에 같은 종류의 작업이 진행 중이면 기존 jobId 반환 (jobs/submit.py, create_job_or_get_active)
-- JobError(retryable=True)는 settings.job_max_retries회까지 자동 재시도. CONTENT_POLICY는 바로 실패
+- JobError(retryable=True)는 작업 종류별 재시도 횟수(_max_retries)까지 자동 재시도. CONTENT_POLICY는 바로 실패
+- generate_image는 E2 핸들러가 안에서 재시도하므로 실행기 재시도는 0회 (MAX_RETRIES_BY_TYPE)
 - JobError가 아닌 예외는 재시도 없이 실패. error_code는 NULL(API에서 INTERNAL_ERROR)
 - 성공 후처리(on_success)와 succeeded는 같은 세션에서 한 번에 commit한다. 후처리가 실패하면 핸들러는 다시 실행하지 않는다
+- 후처리가 돌려준 다음 작업의 행(queued)도 같은 트랜잭션에서 만든다. commit 뒤에는 enqueue로 실행만 한다.
+  요청의 BackgroundTasks는 쓰지 않는다
 - on_failure는 최종 실패와 서버 시작 시 INTERRUPTED에서만 호출한다. 재시도 중간에는 호출하지 않는다
 - 실패 후처리가 예외를 내도 실행기는 멈추지 않는다. 작업은 그 전에 failed로 commit되어 있다
 - 시작 시 claim_job으로 queued를 running으로 한 번만 가져간다. 못 가져가면 핸들러·이벤트·후처리 없이 끝낸다
 - 재시도는 이미 가져온 작업의 루프 안에서 이어지므로 claim_job을 다시 부르지 않는다
 - SSE(publish_job_event)는 commit 뒤에 보낸다
 - 서버 재시작 시 running·queued 작업은 INTERRUPTED로 실패 처리 (recover_interrupted)
-- 이미지 생성 동시 요청 수는 settings.image_max_concurrency로 제한 (C-S3-02)
+- generate_image는 image_slots(settings.image_max_concurrency개)를 얻은 뒤에 claim한다. 기다리는 동안 queued
 """
+import contextlib
 import logging
 import shutil
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -23,13 +28,15 @@ from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 # 작업 함수 등록(@register). worker가 registry를 import하므로 registry가 아니라 여기서 불러온다
+import app.jobs.handlers.images
+import app.jobs.handlers.scenes  # noqa: F401
 import worker.image_gen.generate
-import worker.render.handler  # noqa: F401
+import worker.render.handler
 from app.core.config import settings
-from app.core.enums import FailureCode, JobStage, JobStatus
+from app.core.enums import FailureCode, JobStage, JobStatus, JobType
 from app.db.session import SessionLocal
 from app.jobs.context import JobError
-from app.jobs.registry import get_handler, get_on_failure, get_on_success
+from app.jobs.registry import FollowUp, get_handler, get_on_failure, get_on_success
 from app.models import Job
 from app.repositories import jobs as job_repo
 from app.services import repo_bridge
@@ -38,12 +45,26 @@ from app.services.job_views import job_summary
 from app.services.transactions import commit, rollback
 from app.storage import paths
 
+logger = logging.getLogger(__name__)
+
+# 나레이션(TTS)은 선택 기능이다. mutagen이 없으면 ImportError만 남기고 등록을 건너뛴다.
+# 서버는 계속 뜬다. 이미지 생성(worker.image_gen)과 렌더링(worker.render.handler)은 필수라 감싸지 않는다.
+try:
+    import worker.render.narration  # noqa: F401
+except ImportError as exc:
+    logger.error("나레이션(TTS) 핸들러를 등록하지 못함: %s", exc)
+
 INTERNAL_ERROR_MESSAGE = "처리 중 오류가 발생했습니다. 다시 시도해 주세요."
 
 # 테스트에서 테스트 DB 세션으로 바꿔 끼운다
 session_factory = SessionLocal
 
-logger = logging.getLogger(__name__)
+# 작업 종류별 실행기 재시도 횟수. 없으면 settings.job_max_retries.
+# generate_image는 E2가 안에서 최대 2회 재시도하므로, 실행기도 재시도하면 장면당 API 호출이 9번까지 늘어난다
+MAX_RETRIES_BY_TYPE: dict[JobType, int] = {JobType.GENERATE_IMAGE: 0}
+
+# 외부 이미지 API 동시 요청 수 제한. 테스트에서 바꿔 끼운다
+image_slots = threading.BoundedSemaphore(settings.image_max_concurrency)
 
 _PATH_KINDS = {
     "scene_original": paths.scene_original,
@@ -91,8 +112,35 @@ def schedule(background_tasks: BackgroundTasks, job_id: int, payload: dict | Non
     background_tasks.add_task(run_job, job_id, payload or {})
 
 
-def run_job(job_id: int, payload: dict) -> None:
+def enqueue(job_id: int, payload: dict | None = None) -> None:
+    """요청의 BackgroundTasks 없이 작업을 실행한다. commit된 뒤의 다음 작업에 쓴다."""
+    threading.Thread(target=run_job, args=(job_id, payload or {}), daemon=True).start()
+
+
+def _max_retries(job_type: JobType | str) -> int:
+    return MAX_RETRIES_BY_TYPE.get(JobType(job_type), settings.job_max_retries)
+
+
+def _slot_for(job_id: int) -> contextlib.AbstractContextManager:
+    """generate_image면 image_slots를, 아니면 아무것도 잡지 않는 컨텍스트를 돌려준다.
+
+    작업 종류만 짧은 세션으로 읽고 닫는다. 슬롯을 기다리는 동안 DB 연결을 잡지 않는다.
+    """
     with session_factory() as db:
+        job = job_repo.get_job(db, job_id)
+        job_type = None if job is None else job.type
+    if job_type == JobType.GENERATE_IMAGE:
+        return image_slots
+    return contextlib.nullcontext()
+
+
+def run_job(job_id: int, payload: dict) -> None:
+    try:
+        slot = _slot_for(job_id)
+    except Exception:
+        logger.exception("작업 %s 종류 조회 실패", job_id)
+        slot = contextlib.nullcontext()
+    with slot, session_factory() as db:
         try:
             _run(db, job_id, payload)
         except Exception:
@@ -145,18 +193,36 @@ def _fail(
     publish_job_event(job_summary(job))
 
 
+def _create_followups(db: Session, dream_id: int, followups: list[FollowUp]) -> list[tuple[int, dict]]:
+    """다음 작업 행(queued)을 호출한 쪽의 트랜잭션 안에서 만든다. commit하지 않는다."""
+    queued: list[tuple[int, dict]] = []
+    for spec in followups:
+        child = job_repo.create_job_or_get_active(db, dream_id, spec.job_type, spec.target_id)
+        queued.append((child.id, spec.payload))
+    return queued
+
+
 def _complete(db: Session, job_id: int, result: dict) -> None:
-    """성공 후처리와 succeeded를 한 트랜잭션으로 commit한 뒤 SSE를 보낸다."""
+    """성공 후처리, 다음 작업 행, succeeded를 한 트랜잭션으로 commit한 뒤 다음 작업을 실행하고 SSE를 보낸다.
+
+    commit 직후 서버가 꺼져도 다음 작업 행은 queued로 남아, 재시작 때 INTERRUPTED로 처리된다.
+    """
     job = job_repo.get_job(db, job_id)
     if job is None:
         raise RuntimeError(f"작업 {job_id}이 없습니다.")
     hook = get_on_success(job.type)
-    if hook is not None:
-        hook(db, job, result)
+    followups = hook(db, job, result) if hook is not None else None
+    queued = _create_followups(db, job.dream_id, followups or [])
     job = job_repo.update_job(db, job_id, status=JobStatus.SUCCEEDED)
     if job is None:
         raise RuntimeError(f"작업 {job_id}이 없습니다.")
     commit(db)
+    for child_id, payload in queued:
+        try:
+            enqueue(child_id, payload)
+        except Exception:
+            # 행은 이미 commit됐다. queued로 남은 작업은 재시작 때 INTERRUPTED가 되어 다시 요청할 수 있다
+            logger.exception("작업 %s의 다음 작업 %s 실행 실패", job_id, child_id)
     publish_job_event(job_summary(job))
 
 
@@ -179,7 +245,7 @@ def _run(db: Session, job_id: int, payload: dict) -> None:
         return
 
     ctx = RunnerContext(db, job)
-    max_attempts = settings.job_max_retries + 1
+    max_attempts = _max_retries(job.type) + 1
     attempt = job.attempt
     while True:
         attempt += 1

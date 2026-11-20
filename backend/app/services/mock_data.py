@@ -25,6 +25,10 @@ def _image_url(scene_id: int) -> str:
     return paths.public_url(paths.scene_original(DREAM_ID, scene_id, 1))
 
 
+# 장면 이미지 주소 끝의 ?v=는 generated_at(초 단위 타임스탬프). 2026-11-14T09:02:00+09:00
+IMAGE_VERSION = 1794528120
+
+
 VIDEO_URL = paths.public_url(paths.render_video(DREAM_ID, RENDER_ID))
 
 # 요청 예시
@@ -68,13 +72,44 @@ DREAM_LIST = {
         {
             "dream_id": DREAM_ID,
             "created_at": CREATED_AT,
-            "thumbnail_url": _image_url(1),
-            "summary": "어두운 학교 복도에서 할머니에게 노란 우산을 받고, 창밖의 회색 바다를 본 꿈",
+            "thumbnail_url": f"{_image_url(1)}?v={IMAGE_VERSION}",
+            "summary": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
             "status": "rendered",
+            "input_type": "voice",
+            "has_video": True,
         }
     ],
     "next_cursor": None,
 }
+
+_ANSWERED_QUESTION = {
+    "question_id": 2,
+    "order": 2,
+    "target_element": "할머니",
+    "question": "할머니는 어떤 모습이었나요?",
+    "answered": True,
+    "skipped": False,
+    "answer": "흰 머리에 분홍색 카디건을 입고 있었어요.",
+}
+_SKIPPED_QUESTION = {
+    "question_id": 3,
+    "order": 3,
+    "target_element": "할머니",
+    "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요.",
+    "answered": True,
+    "skipped": True,
+    "answer": None,
+}
+_UNANSWERED_QUESTION = {
+    "question_id": 6,
+    "order": 6,
+    "target_element": None,
+    "question": "꿈이 어떻게 끝났는지 기억나나요?",
+    "answered": False,
+    "skipped": False,
+    "answer": None,
+}
+QUESTION_ITEM_EXAMPLES = [_ANSWERED_QUESTION, _SKIPPED_QUESTION, _UNANSWERED_QUESTION]
 
 INTERVIEW = {
     "questions": [
@@ -85,23 +120,10 @@ INTERVIEW = {
             "question": "복도에서 기억나는 것을 자유롭게 말해 주세요.",
             "answered": True,
             "skipped": False,
+            "answer": "형광등이 깜빡이고 복도가 어두웠어요.",
         },
-        {
-            "question_id": 2,
-            "order": 2,
-            "target_element": "할머니",
-            "question": "할머니는 어떤 모습이었나요?",
-            "answered": True,
-            "skipped": False,
-        },
-        {
-            "question_id": 3,
-            "order": 3,
-            "target_element": "할머니",
-            "question": "할머니가 무언가 말을 했나요? 기억나는 대로 말해 주세요.",
-            "answered": True,
-            "skipped": True,
-        },
+        _ANSWERED_QUESTION,
+        _SKIPPED_QUESTION,
         {
             "question_id": 4,
             "order": 4,
@@ -109,6 +131,7 @@ INTERVIEW = {
             "question": "우산은 어떻게 생겼나요?",
             "answered": True,
             "skipped": False,
+            "answer": "노란색 장우산이었어요.",
         },
         {
             "question_id": 5,
@@ -117,17 +140,11 @@ INTERVIEW = {
             "question": "바다를 봤을 때 주변은 어땠나요?",
             "answered": True,
             "skipped": False,
+            "answer": "창밖이 온통 회색 바다였고 파도가 높았어요.",
         },
-        {
-            "question_id": 6,
-            "order": 6,
-            "target_element": None,
-            "question": "꿈이 어떻게 끝났는지 기억나나요?",
-            "answered": True,
-            "skipped": False,
-        },
+        _UNANSWERED_QUESTION,
     ],
-    "answered": 6,
+    "answered": 5,
     "total": 6,
 }
 
@@ -222,37 +239,58 @@ SCENES = {
             "scene_id": 1,
             "order": 1,
             "summary_ko": "형광등이 깜빡이는 어두운 학교 복도를 혼자 걷는다.",
-            "image_url": _image_url(1),
+            "image_url": f"{_image_url(1)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"name": "학교 복도", "type": "place", "confidence": "high"},
-                {"name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
             ],
+            "status": "succeeded",
+            "confidence_level": "high",
+            "active_job": None,
         },
         {
             "scene_id": 2,
             "order": 2,
             "summary_ko": "분홍색 카디건을 입은 할머니가 나타나 노란 우산을 건넨다.",
-            "image_url": _image_url(2),
+            "image_url": f"{_image_url(2)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"name": "학교 복도", "type": "place", "confidence": "high"},
-                {"name": "할머니", "type": "person", "confidence": "medium"},
-                {"name": "우산", "type": "object", "confidence": "high"},
-                {"name": "안도감", "type": "emotion", "confidence": "low"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
+                {"element_id": 2, "name": "할머니", "type": "person", "confidence": "medium"},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
+                {"element_id": 6, "name": "안도감", "type": "emotion", "confidence": "low"},
             ],
+            "status": "succeeded",
+            "confidence_level": "high",
+            "active_job": None,
         },
         {
             "scene_id": 3,
             "order": 3,
             "summary_ko": "창밖을 보니 학교 밖이 높은 파도가 치는 회색 바다다.",
-            "image_url": _image_url(3),
+            "image_url": None,
             "version_no": 1,
             "elements": [
-                {"name": "바다", "type": "place", "confidence": "low"},
-                {"name": "우산", "type": "object", "confidence": "high"},
-                {"name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 4, "name": "바다", "type": "place", "confidence": "low"},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
             ],
+            "status": "running",
+            "confidence_level": None,
+            "active_job": {
+                "job_id": 4,
+                "dream_id": DREAM_ID,
+                "type": "generate_image",
+                "target_id": 3,
+                "status": "running",
+                "stage": "requesting",
+                "attempt": 1,
+                "error": None,
+                "created_at": CREATED_AT,
+                "started_at": UPDATED_AT,
+                "finished_at": None,
+            },
         },
     ]
 }

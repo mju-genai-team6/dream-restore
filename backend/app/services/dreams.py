@@ -1,4 +1,4 @@
-"""꿈 기록 처리. 생성·조회·원문 확정·음성 저장·STT는 DB를 쓰고, 목록은 아직 목업이다."""
+"""꿈 기록 처리. 생성·조회·원문 확정·음성 저장·STT·꿈 일기 목록."""
 from pathlib import Path
 from typing import BinaryIO
 from uuid import uuid4
@@ -13,6 +13,7 @@ from app.core.errors import (
     NotFound,
     SttFailed,
     UnsupportedAudio,
+    ValidationFailed,
 )
 from app.llm.interview import transcribe
 from app.models.dream import Dream
@@ -21,11 +22,13 @@ from app.repositories import dreams as dream_repo
 from app.repositories import interview as interview_repo
 from app.repositories import jobs as job_repo
 from app.repositories import renders as render_repo
+from app.repositories import scenes as scene_repo
 from app.repositories.renders import LatestRender
 from app.schemas.dreams import (
     AudioUploadResponse,
     DreamConfirm,
     DreamCreate,
+    DreamListItem,
     DreamListResponse,
     DreamResponse,
     DreamStatusResponse,
@@ -35,6 +38,7 @@ from app.schemas.renders import RenderSummary
 from app.services import mock_data
 from app.services.job_views import job_summary
 from app.services.llm_calls import STT_FAILED_MESSAGE, call_stt, dream_lock
+from app.services.scenes import image_url
 from app.services.transactions import commit, expire_loaded, rollback
 from app.storage import paths
 
@@ -45,6 +49,7 @@ _WEBM_MAGIC = b"\x1a\x45\xdf\xa3"
 _MP4_MAGIC = b"ftyp"  # 4번째 바이트부터
 _MAGIC_BYTES = 8
 _DREAM_JOB_TYPES = frozenset({JobType.GENERATE_SCENES, JobType.RENDER_VIDEO})
+_SUMMARY_PREVIEW_CHARS = 60
 
 
 def ensure_sample_dream(dream_id: int) -> None:
@@ -249,6 +254,37 @@ def upload_audio(
     return AudioUploadResponse(audio_id=audio.id, transcript=text)
 
 
-# TODO(C-S3-05): list_dreams 커서 페이지 조회
-def list_dreams(cursor: str | None, limit: int) -> DreamListResponse:
-    return DreamListResponse.model_validate(mock_data.DREAM_LIST)
+def _text_preview(dream: Dream) -> str | None:
+    text = " ".join((dream.confirmed_text or dream.raw_text or "").split())
+    if not text:
+        return None
+    if len(text) > _SUMMARY_PREVIEW_CHARS:
+        return text[:_SUMMARY_PREVIEW_CHARS] + "…"
+    return text
+
+
+def _list_item(db: Session, dream: Dream) -> DreamListItem:
+    """첫 장면은 order가 가장 작은 장면. 장면·영상은 꿈마다 한 번씩만 읽는다."""
+    scenes = scene_repo.list_scenes(db, dream.id)
+    first = scenes[0].current_version if scenes else None
+    latest = render_repo.get_latest_render(db, dream.id)
+    return DreamListItem(
+        dream_id=dream.id,
+        created_at=dream.created_at,
+        thumbnail_url=image_url(first) if first is not None else None,
+        summary=first.summary_ko if first is not None else _text_preview(dream),
+        status=DreamStatus(dream.status),
+        input_type=InputType(dream.input_type),
+        has_video=_latest_render(latest) is not None,
+    )
+
+
+def list_dreams(db: Session, cursor: str | None, limit: int) -> DreamListResponse:
+    """최신순 커서 페이지. repositories의 cursor는 int이고 API는 str로 주고받는다."""
+    if cursor is not None and not cursor.isdigit():
+        raise ValidationFailed("cursor가 올바르지 않습니다.", {"cursor": cursor})
+    page = dream_repo.list_dreams(db, None if cursor is None else int(cursor), limit)
+    return DreamListResponse(
+        items=[_list_item(db, item.dream) for item in page.items],
+        next_cursor=None if page.next_cursor is None else str(page.next_cursor),
+    )

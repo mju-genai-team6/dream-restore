@@ -116,6 +116,30 @@ def test_answer_and_skip_update_progress(llm, read_db):
     assert llm.kind_count("reextract") == 0
 
 
+def test_get_returns_saved_answer_skip_and_unanswered(llm):
+    dream_id = _text_dream()
+    questions = client.get(f"/dreams/{dream_id}/interview").json()["questions"]
+    assert all(q["answer"] is None and q["skipped"] is False for q in questions)
+
+    saved = "형광등이 깜빡였어요."
+    client.post(
+        f"/dreams/{dream_id}/interview",
+        json={"question_id": questions[0]["question_id"], "answer": saved},
+    )
+    client.post(
+        f"/dreams/{dream_id}/interview",
+        json={"question_id": questions[1]["question_id"], "answer": "무시됨", "skipped": True},
+    )
+
+    again = client.get(f"/dreams/{dream_id}/interview").json()["questions"]
+    assert again[0]["answer"] == saved
+    assert again[0]["skipped"] is False
+    assert again[1]["answer"] is None
+    assert again[1]["skipped"] is True
+    assert again[2]["answer"] is None
+    assert again[2]["skipped"] is False
+
+
 def test_answer_can_be_changed_before_reextract(llm, read_db):
     dream_id = _text_dream()
     question_id = client.get(f"/dreams/{dream_id}/interview").json()["questions"][0]["question_id"]

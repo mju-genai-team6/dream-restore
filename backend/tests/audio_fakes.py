@@ -3,10 +3,7 @@ import threading
 import time
 from pathlib import Path
 
-import httpx
-import openai
-
-from app.llm.client import LlmCallError, SttError
+from app.llm.client import LlmCallError, LlmTimeoutError, SttEmptyResultError, SttError
 
 WEBM_BYTES = b"\x1a\x45\xdf\xa3fake-webm"
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42fake-mp4"
@@ -14,7 +11,7 @@ TRANSCRIPT = "하늘을 나는 꿈을 꿨어요."
 
 
 class FakeTranscribe:
-    """받은 경로를 기록하고 정해진 결과를 돌려준다. mode: ok, stt_error, timeout, no_key."""
+    """받은 경로를 기록하고 정해진 결과를 돌려준다. mode: ok, stt_error, empty, timeout, no_key."""
 
     def __init__(self, text: str = TRANSCRIPT, *, mode: str = "ok", delay: float = 0.0, on_call=None):
         self.text = text
@@ -38,12 +35,10 @@ class FakeTranscribe:
                 time.sleep(self.delay)
             if self.mode == "stt_error":
                 raise SttError("음성 인식 실패: 테스트")
+            if self.mode == "empty":
+                raise SttEmptyResultError("음성에서 인식된 내용이 없습니다.")
             if self.mode == "timeout":
-                request = httpx.Request("POST", "https://api.openai.com/v1/audio/transcriptions")
-                try:
-                    raise openai.APITimeoutError(request=request)
-                except openai.APITimeoutError as exc:
-                    raise SttError(f"음성 인식 실패: {exc}") from exc
+                raise LlmTimeoutError("음성 인식 시간 초과")
             if self.mode == "no_key":
                 raise LlmCallError("OPENAI_API_KEY가 설정되지 않았습니다.")
             return self.text

@@ -10,4 +10,4 @@ sse-starlette
 httpx
 Pillow
 openai>=3,<4
-mutagen
+mutagen>=1,<2

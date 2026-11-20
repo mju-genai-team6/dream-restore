@@ -4,10 +4,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import TypeVar
 
-import openai
-
 from app.core.errors import LlmFailed, SttFailed, UpstreamTimeout
-from app.llm.client import LlmCallError, LlmError, LlmSchemaError
+from app.llm.client import LlmCallError, LlmError, LlmSchemaError, LlmTimeoutError
 
 T = TypeVar("T")
 
@@ -31,10 +29,10 @@ def call_llm(func: Callable[..., T], *args, failed_message: str) -> T:
     """LLM 예외를 API 오류로 바꾼다. 시간 초과는 504, 그 밖의 호출 실패와 형식 오류는 502."""
     try:
         return func(*args)
+    except LlmTimeoutError as exc:
+        # LlmCallError의 하위라 아래보다 먼저 잡아야 504가 된다
+        raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
     except LlmCallError as exc:
-        # TODO(D): LlmTimeoutError가 추가되면 __cause__ 대신 그 예외로 판별
-        if isinstance(exc.__cause__, openai.APITimeoutError):
-            raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
         raise LlmFailed(failed_message) from exc
     except LlmSchemaError as exc:
         raise LlmFailed(failed_message) from exc
@@ -44,11 +42,12 @@ def call_stt(func: Callable[..., T], *args) -> T:
     """STT 예외를 API 오류로 바꾼다. 시간 초과는 504, 그 밖은 502 STT_FAILED.
 
     키가 없으면 transcribe가 SttError가 아닌 LlmCallError를 던지므로 LlmError 전체를 잡는다.
+    SttEmptyResultError도 빈 문자열과 같은 502 STT_FAILED, 같은 메시지다.
+    LlmTimeoutError는 LlmError의 하위라 먼저 잡아야 시간 초과가 502가 되지 않는다.
     """
     try:
         return func(*args)
+    except LlmTimeoutError as exc:
+        raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
     except LlmError as exc:
-        # TODO(D): LlmTimeoutError·SttEmptyResultError가 추가되면 __cause__ 대신 그 예외로 판별
-        if isinstance(exc.__cause__, openai.APITimeoutError):
-            raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
         raise SttFailed(STT_FAILED_MESSAGE) from exc

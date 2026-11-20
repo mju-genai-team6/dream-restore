@@ -347,6 +347,7 @@ def test_concurrent_submit_runs_handler_once(monkeypatch, session_factory, read_
         runner.run_job(job_id, payload or {})
 
     monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+    monkeypatch.setitem(ON_SUCCESS, JobType.GENERATE_SCENES, lambda db, job, result: None)
     monkeypatch.setattr(runner, "schedule", run_now)
     barrier = threading.Barrier(5)
 

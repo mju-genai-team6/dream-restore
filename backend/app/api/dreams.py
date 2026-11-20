@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import mark_mock
 from app.db.session import get_db
 from app.schemas.common import error_responses
 from app.schemas.dreams import (
@@ -38,13 +37,13 @@ def create_dream(
     response_model=DreamListResponse,
     summary="꿈 일기 목록 (커서 페이지)",
     responses=error_responses(400),
-    dependencies=[Depends(mark_mock)],
 )
 def list_dreams(
+    db: Annotated[Session, Depends(get_db)],
     cursor: str | None = Query(default=None, description="이전 응답의 next_cursor"),
     limit: int = Query(default=20, ge=1, le=50),
 ) -> DreamListResponse:
-    return dream_service.list_dreams(cursor, limit)
+    return dream_service.list_dreams(db, cursor, limit)
 
 
 @router.get(
