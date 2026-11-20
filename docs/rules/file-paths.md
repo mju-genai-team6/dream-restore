@@ -12,9 +12,11 @@ storage/dreams/{dreamId}/scenes/{sceneId}/v{versionNo}/blur_{level}.png
 storage/dreams/{dreamId}/scenes/{sceneId}/v{versionNo}/narration.mp3
 storage/dreams/{dreamId}/renders/{renderId}/video.mp4
 storage/tmp/{jobId}/          작업 중 임시 파일, 검증 후 위 경로로 이동
+storage/eval/p{participant}_dream{dreamId}/video_1.mp4|video_2.mp4|key.json   S4 확신도 평가 비교 영상 (E1)
 ```
 
 - 음성 파일 이름은 audioId 대신 uuid(32자리 hex)를 씁니다. DB 기록 전에 경로가 필요하기 때문입니다.
 - 음성 파일은 `{uuid}.{ext}.part`로 받은 뒤 다 받으면 최종 이름으로 바꿉니다.
 - 원본 이미지는 덮어쓰지 않습니다. 수정은 새 버전 폴더(`v2`, `v3`...)로 저장합니다.
 - 실험 결과물은 각 실험 폴더의 `outputs/`에 저장합니다 (Git 제외).
+- `storage/eval/`은 `backend/scripts/e1_evaluation.py pair`가 만드는 평가용 파일입니다. DB에 경로를 저장하지 않습니다. 서버의 `/storage` 정적 경로로는 열리므로 `key.json` 주소는 참가자에게 알려 주지 않습니다 (`video_1`·`video_2` 중 어느 쪽이 블러인지 적혀 있음) (`experiments/confidence_blur/results.md` 4.1).
