@@ -12,7 +12,6 @@ from app.jobs.submit import submit_job
 from app.repositories import jobs as job_repo
 from app.repositories import scenes as scene_repo
 from app.schemas.jobs import JobSummary
-from app.services import repo_bridge
 from app.services.interview import require_dream
 from app.services.job_views import job_summary
 from app.services.llm_calls import dream_lock
@@ -46,7 +45,7 @@ def retry_images(db: Session, dream_id: int, background_tasks: BackgroundTasks) 
             if version.id in active:
                 summaries.append(job_summary(active[version.id]))
                 continue
-            repo_bridge.reset_failed_scene_version(db, version.id)
+            scene_repo.reset_failed_scene_version(db, version.id)
             # DB에는 이미지가 없는데 파일만 남았으면(후처리 실패, commit 전 종료) E2가 덮어쓰기를 거절한다
             leftover = settings.storage_path / paths.scene_original(dream_id, scene.id, version.version_no)
             leftover.unlink(missing_ok=True)

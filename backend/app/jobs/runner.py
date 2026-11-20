@@ -39,7 +39,6 @@ from app.jobs.context import JobError
 from app.jobs.registry import FollowUp, get_handler, get_on_failure, get_on_success
 from app.models import Job
 from app.repositories import jobs as job_repo
-from app.services import repo_bridge
 from app.services.events import publish_job_event
 from app.services.job_views import job_summary
 from app.services.transactions import commit, rollback
@@ -228,7 +227,7 @@ def _complete(db: Session, job_id: int, result: dict) -> None:
 
 def _run(db: Session, job_id: int, payload: dict) -> None:
     # 재시도는 아래 루프에서 이어진다. claim은 처음 한 번만 해서 running인 재시도를 건너뛰지 않는다.
-    claimed = repo_bridge.claim_job(db, job_id)
+    claimed = job_repo.claim_job(db, job_id)
     commit(db)
     if not claimed:
         job = job_repo.get_job(db, job_id)
@@ -288,9 +287,9 @@ def recover_interrupted() -> int:
     두 mark 함수는 바꾼 개수만 돌려주므로, UPDATE 전에 대상 id를 조회한 뒤 실패 후처리를 부른다.
     """
     with session_factory() as db:
-        pending_ids = repo_bridge.list_active_job_ids(db)
+        pending_ids = job_repo.list_active_job_ids(db)
         try:
-            count = job_repo.mark_interrupted(db) + repo_bridge.mark_queued_interrupted(db)
+            count = job_repo.mark_interrupted(db) + job_repo.mark_queued_interrupted(db)
             commit(db)
         except Exception:
             rollback(db)
