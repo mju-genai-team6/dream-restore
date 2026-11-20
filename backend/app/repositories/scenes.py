@@ -1,8 +1,9 @@
 """장면과 장면 버전 (scenes, scene_versions). 버전은 추가만 하고 기존 행은 바꾸지 않는다."""
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import ElementType, JobStatus
@@ -89,6 +90,73 @@ def set_current_version(db: Session, scene_id: int, version_id: int) -> Scene | 
 
 def get_scene_version(db: Session, scene_version_id: int) -> SceneVersion | None:
     return db.get(SceneVersion, scene_version_id)
+
+
+def save_image_result(
+    db: Session,
+    scene_version_id: int,
+    *,
+    final_prompt: str,
+    model: str,
+    settings: dict,
+    seed: int | None,
+    image_path: str,
+    generated_at: datetime,
+    confidence_level: str | None,
+) -> bool:
+    """이미지 생성 결과를 한 번에 저장하고 status를 succeeded로 바꾼다. 바뀌었으면 True.
+
+    image_path가 비어 있는 버전만 바꾼다 (결과는 한 번만 채움, scene_versions_guard 트리거와 같은 규칙).
+    confidence_level은 새 값이 None이 아닐 때만 COALESCE(기존 값, 새 값)으로 저장한다.
+    """
+    values: dict = {
+        "final_prompt": final_prompt,
+        "model": model,
+        "settings": settings,
+        "seed": seed,
+        "image_path": image_path,
+        "generated_at": generated_at,
+        "status": JobStatus.SUCCEEDED.value,
+    }
+    if confidence_level is not None:
+        values["confidence_level"] = func.coalesce(SceneVersion.confidence_level, confidence_level)
+    result = db.execute(
+        update(SceneVersion)
+        .where(SceneVersion.id == scene_version_id, SceneVersion.image_path.is_(None))
+        .values(**values)
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount == 1
+
+
+def mark_scene_version_failed(db: Session, scene_version_id: int) -> bool:
+    """이미지가 없고 succeeded가 아닌 버전을 failed로 바꾼다. 바뀌었으면 True."""
+    result = db.execute(
+        update(SceneVersion)
+        .where(
+            SceneVersion.id == scene_version_id,
+            SceneVersion.image_path.is_(None),
+            SceneVersion.status != JobStatus.SUCCEEDED.value,
+        )
+        .values(status=JobStatus.FAILED.value)
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount == 1
+
+
+def reset_failed_scene_version(db: Session, scene_version_id: int) -> bool:
+    """이미지 다시 생성 전에 이미지가 없고 failed인 버전을 queued로 되돌린다. 바뀌었으면 True."""
+    result = db.execute(
+        update(SceneVersion)
+        .where(
+            SceneVersion.id == scene_version_id,
+            SceneVersion.image_path.is_(None),
+            SceneVersion.status == JobStatus.FAILED.value,
+        )
+        .values(status=JobStatus.QUEUED.value)
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount == 1
 
 
 def list_scene_characters(db: Session, scene_version_id: int) -> list[dict] | None:

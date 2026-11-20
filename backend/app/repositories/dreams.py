@@ -22,6 +22,17 @@ def get_dream(db: Session, dream_id: int) -> Dream | None:
     return db.get(Dream, dream_id)
 
 
+def lock_dream(db: Session, dream_id: int) -> Dream | None:
+    """꿈 행을 SELECT ... FOR UPDATE로 잠그고 최신 값으로 돌려준다. 없으면 None.
+
+    트랜잭션이 끝날 때(commit·rollback)까지 같은 꿈을 잠그려는 다른 요청은 기다린다.
+    예: 이미지 작업 후처리가 동시에 끝날 때 앞 작업이 commit한 뒤에 all_images_done을 읽게 한다.
+    """
+    return db.scalar(
+        select(Dream).where(Dream.id == dream_id).with_for_update().execution_options(populate_existing=True)
+    )
+
+
 def update_raw_text(db: Session, dream_id: int, raw_text: str) -> Dream | None:
     """입력 원문(STT 변환 결과)을 저장한다. 꿈 기록이 없으면 None."""
     dream = db.get(Dream, dream_id)
