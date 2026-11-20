@@ -119,3 +119,49 @@ def mark_interrupted(db: Session) -> int:
         .execution_options(synchronize_session="fetch")
     )
     return result.rowcount
+
+
+QUEUED_INTERRUPTED_MESSAGE = "서버가 다시 시작되어 작업이 중단되었습니다. 다시 시도해 주세요."
+
+
+def claim_job(db: Session, job_id: int) -> bool:
+    """queued인 작업만 running으로 바꾸고 started_at을 기록한다. 바뀌었으면 True.
+
+    WHERE status = 'queued' 조건으로 바꾸므로 두 실행기가 같은 작업을 동시에 시작해도 한 쪽만 True다.
+    """
+    result = db.execute(
+        update(Job)
+        .where(Job.id == job_id, Job.status == JobStatus.QUEUED.value)
+        .values(status=JobStatus.RUNNING.value, started_at=func.now())
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount == 1
+
+
+def list_active_job_ids(db: Session) -> list[int]:
+    """행을 바꾸지 않고 queued·running 작업 id를 만든 순서(created_at, id)대로 돌려준다.
+
+    서버 재시작 처리 때 mark_interrupted·mark_queued_interrupted보다 먼저 불러 후처리 대상을 얻는다.
+    """
+    return list(
+        db.scalars(select(Job.id).where(Job.status.in_(ACTIVE_JOB_STATUSES)).order_by(Job.created_at, Job.id))
+    )
+
+
+def mark_queued_interrupted(db: Session) -> int:
+    """서버 재시작 시 호출. queued로 남은 작업을 failed(INTERRUPTED)로 바꾸고, 바꾼 개수를 돌려준다.
+
+    BackgroundTasks에 있던 작업은 재시작하면 사라지므로 queued 행은 다시 실행되지 않는다.
+    """
+    result = db.execute(
+        update(Job)
+        .where(Job.status == JobStatus.QUEUED.value)
+        .values(
+            status=JobStatus.FAILED.value,
+            error_code=FailureCode.INTERRUPTED.value,
+            error_message=QUEUED_INTERRUPTED_MESSAGE,
+            finished_at=func.now(),
+        )
+        .execution_options(synchronize_session="fetch")
+    )
+    return result.rowcount
