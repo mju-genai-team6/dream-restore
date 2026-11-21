@@ -57,13 +57,13 @@ export default function StoryboardPanel({ dream, fromApi = false }: { dream: Dre
         {dream.scenes.length ? <div className={styles.sceneGrid}>{dream.scenes.map((scene, index) => {
           const latest = latestVersion(scene);
           return <button type="button" key={scene.id} className={`${styles.sceneCard} ${selected?.id === scene.id ? styles.selectedCard : ""}`} aria-pressed={selected?.id === scene.id} aria-label={fromApi ? `${latest.title} 선택` : `장면 ${index + 1} ${latest.title} 선택`} onClick={() => selectScene(scene.id)}>
-            <div className={styles.sceneImage}>{fromApi ? <ArchiveMedia url={scene.imageUrl} label={latest.title} /> : <SceneArtwork kind={scene.artwork} label={latest.title} />}<span className={styles.versionBadge}>v{latest.version}</span>{selected?.id === scene.id && <span className={styles.selectionCheck}><Icon name="check" size={14} /></span>}</div>
+            <div className={styles.sceneImage}>{fromApi ? <ArchiveMedia url={scene.imageUrl} status={scene.imageStatus} label={latest.title} /> : <SceneArtwork kind={scene.artwork} label={latest.title} />}<span className={styles.versionBadge}>v{latest.version}</span>{selected?.id === scene.id && <span className={styles.selectionCheck}><Icon name="check" size={14} /></span>}</div>
             <div className={styles.sceneCardBody}><span className={styles.sceneNumber}>{index + 1}</span><div><h3>{latest.title}</h3><p>{latest.description}</p></div></div>
           </button>;
         })}</div> : <div className={styles.emptyState}><Icon name="storyboard" size={34} /><h3>아직 준비된 장면이 없어요</h3><p>장면이 준비되면 이곳에서 확인할 수 있어요.</p></div>}
       </div>
       {selected && version && <section className={styles.selectedSummary} aria-label="선택한 장면 미리보기">
-        <div className={styles.summaryImage}>{fromApi ? <ArchiveMedia url={selected.imageUrl} label={version.title} /> : <SceneArtwork kind={selected.artwork} label={version.title} />}</div>
+        <div className={styles.summaryImage}>{fromApi ? <ArchiveMedia url={selected.imageUrl} status={selected.imageStatus} label={version.title} /> : <SceneArtwork kind={selected.artwork} label={version.title} />}</div>
         <div className={styles.summaryText}><span className={styles.eyebrow}>선택한 장면</span><h2>{version.title}</h2><p>{version.description}</p>{version.place && <span className={styles.location}><Icon name="pin" size={15} />{version.place}</span>}</div>
       </section>}
       {!fromApi && <p className={styles.bottomNote}><Icon name="info" size={14} />이미지는 화면 확인용 예시이며, 장면을 수정해도 자동으로 바뀌지 않습니다.</p>}
@@ -72,7 +72,7 @@ export default function StoryboardPanel({ dream, fromApi = false }: { dream: Dre
       {selected && version && current ? editing ? <SceneEditor key={selected.id} dreamId={dream.id} scene={selected} onClose={() => setEditing(false)} onSaved={(message) => { setNotice(message); setViewedVersion(null); }} /> : <>
         <div className={styles.panelHeading}><h2>장면 자세히 보기</h2><span className={styles.smallBadge}>v{version.version}</span></div>
         <p className={styles.helper}>꿈의 내용과 기억의 확신도를 확인하세요.</p>
-        <div className={styles.detailImage}>{fromApi ? <ArchiveMedia url={selected.imageUrl} label={version.title} /> : <SceneArtwork kind={selected.artwork} label={version.title} />}</div>
+        <div className={styles.detailImage}>{fromApi ? <ArchiveMedia url={selected.imageUrl} status={selected.imageStatus} label={version.title} /> : <SceneArtwork kind={selected.artwork} label={version.title} />}</div>
         <div className={styles.detailTitle}><h3>{version.title}</h3>{version.place && <span className={styles.location}><Icon name="pin" size={14} />{version.place}</span>}</div>
         <p className={styles.sceneDescription}>{version.description}</p>
         <section className={styles.confidenceSection}><h3>요소별 기억의 확신도</h3><ul>{version.elements.map((element) => <li key={element.id}><span>{element.name}</span><span className={`${styles.confidenceBadge} ${element.confidence ? styles[element.confidence] : ""}`}>{element.confidence ? confidenceLabels[element.confidence] : "미입력"}</span></li>)}</ul><p>기억이 분명한 정도이며, AI의 정확도를 뜻하지 않아요.</p></section>
