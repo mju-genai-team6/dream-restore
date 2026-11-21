@@ -129,6 +129,7 @@ function ApiDream({ baseUrl, id, jobId, view }: { baseUrl: string; id: string; j
   const working = active(job) || pendingImages > 0;
   const canRender = dream && ["images_ready", "rendered"].includes(dream.status) && dream.scenes.length > 0 &&
     dream.scenes.every((scene) => scene.imageStatus === "succeeded") && !working;
+  const renderFailed = job?.type === "render_video" && job.status === "failed";
 
   return <ResultsLayout view={view} onNavigate={navigate} dream={dream} fromApi>
     {error && (dream ? <div className={styles.warning} role="alert">{error} <button type="button" className={styles.secondaryButton} onClick={refresh}>새로고침</button></div>
@@ -141,7 +142,9 @@ function ApiDream({ baseUrl, id, jobId, view }: { baseUrl: string; id: string; j
         {dream.scenes.length > 0 && ` · 이미지 ${dream.scenes.filter((scene) => scene.imageStatus === "succeeded").length}/${dream.scenes.length}개 완료`}
       </p>}
       {job?.status === "failed" && <div className={styles.warning} role="alert">
-        {job.error?.message || "생성 작업을 완료하지 못했어요. 다시 시도해 주세요."}
+        {renderFailed ? "영상을 만들지 못했어요. 장면은 그대로 보관되어 있어요."
+          : job.error?.message || "생성 작업을 완료하지 못했어요. 다시 시도해 주세요."}
+        {renderFailed && canRender && <p>잠시 후 아래 ‘영상 다시 시도’를 눌러 주세요. 문제가 계속되면 나중에 다시 이용해 주세요.</p>}
         {job.type === "generate_scenes" && dream.status === "interviewing" &&
           <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => request("scenes")}>장면 생성 다시 시도</button>}
       </div>}
@@ -153,7 +156,7 @@ function ApiDream({ baseUrl, id, jobId, view }: { baseUrl: string; id: string; j
       </p>}
       <div className={styles.resultActions}>
         <button type="button" className={styles.secondaryButton} onClick={refresh} disabled={busy}>새로고침</button>
-        <button type="button" className={styles.primaryButton} disabled={busy || !canRender} onClick={() => request("video")}>{busy ? "요청 중" : dream.video ? "영상 다시 만들기" : "영상 만들기"}</button>
+        <button type="button" className={styles.primaryButton} disabled={busy || !canRender} onClick={() => request("video")}>{busy ? "요청 중" : renderFailed ? "영상 다시 시도" : dream.video ? "영상 다시 만들기" : "영상 만들기"}</button>
       </div>
       {view === "video" ? <VideoPanel dream={dream} onStoryboard={() => navigate("storyboard")} fromApi />
         : <StoryboardPanel dream={dream} fromApi />}
