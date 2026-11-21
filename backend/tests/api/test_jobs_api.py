@@ -16,8 +16,8 @@ from app.llm.schemas import Scene as LlmScene
 from app.llm.schemas import SceneCharacter, SceneSplitResult
 from app.main import app
 from app.repositories import jobs as job_repo
+from app.repositories.jobs import QUEUED_INTERRUPTED_MESSAGE
 from app.schemas.jobs import JobSummary
-from app.services.repo_bridge import QUEUED_INTERRUPTED_MESSAGE
 from tests.api import rows
 from tests.llm_fakes import FakeLlm
 from worker.image_gen.generate import handle_generate_image

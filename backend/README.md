@@ -8,7 +8,6 @@ app/                FastAPI 서버
   db/  models/      DB 연결, 테이블
   schemas/          API 요청/응답 스키마
   services/         비즈니스 로직, 상태 전이
-    repo_bridge.py  DB 담당 반영 전 임시 함수 (repositories에 들어오면 교체 후 삭제)
   jobs/             작업 실행기, 작업 함수 규격(context), 등록(registry)
     submit.py       작업 등록 (진행 중인 같은 작업이 있으면 그 작업을 돌려줌)
     handlers/       장면 생성·이미지 작업 함수와 후처리

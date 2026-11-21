@@ -16,7 +16,7 @@ from app.jobs.submit import submit_job
 from app.main import app
 from app.models import Dream
 from app.repositories import jobs as job_repo
-from app.services.repo_bridge import QUEUED_INTERRUPTED_MESSAGE
+from app.repositories.jobs import QUEUED_INTERRUPTED_MESSAGE
 from tests.api import rows
 
 client = TestClient(app)

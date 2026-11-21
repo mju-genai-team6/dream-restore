@@ -23,7 +23,6 @@ from app.models.scene import SceneVersion
 from app.repositories import dreams as dream_repo
 from app.repositories import extractions as extraction_repo
 from app.repositories import scenes as scene_repo
-from app.services import repo_bridge
 from app.services.state_machine import ensure_transition
 from app.storage import paths
 from worker.image_gen.config import image_settings as img_cfg
@@ -72,11 +71,11 @@ def save_image(db: Session, job: Job, result: dict) -> None:
     꿈 행을 먼저 잠근다. 마지막 두 장면이 동시에 끝나도 뒤 작업은 앞 작업의 commit을 본 뒤
     all_images_done을 읽으므로, 둘 다 False로 보고 전이를 놓치는 일이 없다.
     """
-    repo_bridge.lock_dream(db, job.dream_id)
+    dream_repo.lock_dream(db, job.dream_id)
     version = scene_repo.get_scene_version(db, job.target_id) if job.target_id else None
     if version is None:
         raise JobError(FailureCode.INVALID_INPUT, MISSING_VERSION_MESSAGE)
-    saved = repo_bridge.save_image_result(
+    saved = scene_repo.save_image_result(
         db,
         version.id,
         final_prompt=result["final_prompt"],
@@ -101,7 +100,7 @@ def save_image(db: Session, job: Job, result: dict) -> None:
 def mark_image_failed(db: Session, job: Job, error_code: str | None, error_message: str) -> None:
     """장면 버전만 failed로 바꾼다. 꿈 상태는 scenes_ready 그대로 둔다."""
     if job.target_id is not None:
-        repo_bridge.mark_scene_version_failed(db, job.target_id)
+        scene_repo.mark_scene_version_failed(db, job.target_id)
 
 
 def _scene_order(scene_id: int) -> int:
