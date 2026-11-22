@@ -114,6 +114,9 @@
 .success { color: #3d8071; font-size: 11px; line-height: 1.8; margin-top: 16px; }
 .error { color: #ab555f; font-size: 11px; line-height: 1.8; }
 .warning { border: 1px solid #eadbb9; background: #fffaf0; color: #8b7243; padding: 12px 15px; border-radius: 9px; font-size: 11px; line-height: 1.8; margin-bottom: 18px; }
+.warning button { margin: 6px 0 0 10px; }
+.progressNotice { padding: 14px 17px; margin-bottom: 18px; color: #61578b; background: #eeebfa; border-radius: 10px; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.resultActions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
 .search { display: flex; align-items: center; gap: 9px; padding: 10px 13px; border: 1px solid #e7e5f1; border-radius: 10px; color: #9b96b2; margin: 0 0 20px; background: #fdfcff; }
 .search input { border: 0; outline: none; background: transparent; color: #58617a; font-size: 12px; min-width: 0; width: 100%; }
 .search input::placeholder { color: #9d9eb0; }
