@@ -11,7 +11,7 @@ function VideoPlayer({ url, title }: { url: string; title: string }) {
   return <video className={styles.videoPlayer} controls preload="metadata" src={url} aria-label={`${title} 영상`} onError={() => setFailed(true)}>현재 브라우저에서 영상을 재생할 수 없습니다.</video>;
 }
 
-export default function VideoPanel({ dream, onStoryboard }: { dream: Dream; onStoryboard: () => void }) {
+export default function VideoPanel({ dream, onStoryboard, fromApi = false }: { dream: Dream; onStoryboard: () => void; fromApi?: boolean }) {
   const currentVideo = videoMatchesScenes(dream);
   return <div className={styles.workspace}>
     <section className={styles.board} aria-label="꿈 영상 결과">
@@ -20,7 +20,7 @@ export default function VideoPanel({ dream, onStoryboard }: { dream: Dream; onSt
         {!currentVideo && <p className={styles.warning} role="status">장면을 수정하기 전의 영상입니다. 현재 스토리보드와 내용이 다를 수 있어요.</p>}
         <VideoPlayer key={dream.video.url} url={dream.video.url} title={dream.title} />
       </> : <div className={styles.videoEmpty}><span className={styles.playSymbol}><Icon name="video" size={36} /></span><h3>아직 완성된 영상이 없어요</h3><p>장면을 확인한 뒤 완성된 꿈 영상을<br />이곳에서 다시 볼 수 있어요.</p><button type="button" className={styles.secondaryButton} onClick={onStoryboard}>스토리보드 확인<Icon name="arrow" size={16} /></button></div>}
-      <p className={styles.videoNote}><Icon name="info" size={16} />예시 모드에서는 영상이 생성되지 않습니다. 영상 생성 결과를 연결하면 재생할 수 있습니다.</p>
+      <p className={styles.videoNote}><Icon name="info" size={16} />{fromApi ? "기억의 확신도에 따라 흐림 효과가 영상에 반영됩니다." : "예시 모드에서는 영상이 생성되지 않습니다. 영상 생성 결과를 연결하면 재생할 수 있습니다."}</p>
     </section>
     <aside className={styles.detailPanel} aria-label="영상의 꿈 정보">
       <div className={styles.panelHeading}><h2>이 꿈의 기록</h2><Icon name="video" size={19} /></div>

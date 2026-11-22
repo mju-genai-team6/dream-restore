@@ -7,6 +7,10 @@ import SceneArtwork from "./SceneArtwork";
 import ArchiveMedia from "./ArchiveMedia";
 import styles from "./dream-results.module.css";
 
+const statusLabels: Record<Dream["status"], string> = {
+  recorded: "기록 중", interviewing: "인터뷰·장면 준비", scenes_ready: "장면 준비됨", images_ready: "이미지 완성", rendered: "영상 완성",
+};
+
 export default function ArchivePanel({ dreams, selectedId, onSelect, onOpen, fromApi = false }: {
   dreams: Dream[]; selectedId: string; onSelect: (id: string) => void; onOpen: () => void; fromApi?: boolean;
 }) {
@@ -25,6 +29,7 @@ export default function ArchivePanel({ dreams, selectedId, onSelect, onOpen, fro
           <div className={styles.archiveInfo}>
             <time dateTime={dream.recordedAt}>{formatDate(dream.recordedAt)}</time>
             <h3>{dream.title}</h3>
+            {fromApi && <span>{statusLabels[dream.status]} · {dream.hasVideo ? "영상 있음" : "영상 없음"}</span>}
             {!fromApi && <><p>{dream.originalText}</p><span>{dream.scenes.length}개 장면 <span aria-hidden="true">·</span> {videoMatchesScenes(dream) ? "영상 있음" : dream.video ? "수정 전 영상 있음" : "장면 기록"}</span></>}
           </div>
           <Icon name="arrow" size={18} />
@@ -38,6 +43,7 @@ export default function ArchivePanel({ dreams, selectedId, onSelect, onOpen, fro
         {fromApi ? <div className={styles.detailImage}><ArchiveMedia url={selected.thumbnailUrl} label={selected.title} /></div> : first && <div className={styles.detailImage}><SceneArtwork kind={first.artwork} label={selected.title} /></div>}
         <time className={styles.detailDate} dateTime={selected.recordedAt}>{formatDate(selected.recordedAt)}</time>
         <h3 className={styles.archiveDetailTitle}>{selected.title}</h3>
+        {fromApi && <p className={styles.helper}>{statusLabels[selected.status]} · {selected.hasVideo ? "완성 영상 있음" : "완성 영상 없음"}</p>}
         {!fromApi && <><section className={styles.originalRecord}><h4>처음 남긴 꿈 이야기</h4><p>{selected.originalText}</p></section>
         <dl className={styles.facts}><div><dt>장면</dt><dd>{selected.scenes.length}개</dd></div><div><dt>수정한 장면</dt><dd>{selected.scenes.filter((scene) => latestVersion(scene).version > 1).length}개</dd></div><div><dt>영상</dt><dd>{videoMatchesScenes(selected) ? "재생 가능" : selected.video ? "수정 전 영상" : "아직 없음"}</dd></div></dl>
         </>}
