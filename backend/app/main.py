@@ -6,13 +6,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
 from app.core.config import settings
 from app.core.errors import AudioTooLarge, error_body, register_error_handlers
 from app.jobs import runner
 from app.jobs.handlers.images import install_image_handler
+from app.storage.files import StorageFiles
 
 # uvicorn이 핸들러를 붙여 둔 로거. app 로거의 INFO는 로깅 설정이 없어 출력되지 않는다
 logger = logging.getLogger("uvicorn.error")
@@ -63,7 +63,7 @@ register_error_handlers(app)
 app.include_router(api_router)
 
 settings.storage_path.mkdir(parents=True, exist_ok=True)
-app.mount("/storage", StaticFiles(directory=settings.storage_path), name="storage")
+app.mount("/storage", StorageFiles(directory=settings.storage_path), name="storage")
 
 
 @app.get("/health", tags=["system"])
