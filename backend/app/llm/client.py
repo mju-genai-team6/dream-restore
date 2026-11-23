@@ -13,6 +13,9 @@ from app.core.config import settings
 
 PROMPT_DIR = Path(__file__).parent / "prompts"
 MAX_RETRIES = 2  # 처음 1회 + 재요청 2회 = 최대 3회 호출
+# OpenAI SDK가 네트워크 오류·시간 초과 때 스스로 다시 보내는 횟수 (SDK 기본값 2).
+# 기본값이면 응답이 없을 때 오류까지 timeout × 3이 걸려 화면이 오래 멈추므로 1회로 줄인다.
+OPENAI_MAX_RETRIES = 1
 
 Message = dict[str, str]
 # 대화 목록을 받아 LLM의 답(문자열)을 돌려주는 함수. 테스트에서는 가짜 함수로 바꿔 끼웁니다.
@@ -54,7 +57,11 @@ def get_openai_client():
         raise LlmCallError("OPENAI_API_KEY가 설정되지 않았습니다. .env 파일을 확인해 주세요.")
     from openai import OpenAI  # 키 없이도 테스트를 돌릴 수 있게 여기서 import
 
-    return OpenAI(api_key=settings.openai_api_key, timeout=settings.llm_timeout_seconds)
+    return OpenAI(
+        api_key=settings.openai_api_key,
+        timeout=settings.llm_timeout_seconds,
+        max_retries=OPENAI_MAX_RETRIES,
+    )
 
 
 def openai_complete(messages: list[Message]) -> str:
