@@ -25,7 +25,9 @@ class InterviewQuestion(BaseModel):
 
     order: int = Field(ge=1, description="1부터 시작하는 질문 순서")
     target_element: str | None = Field(
-        default=None, description="질문 대상 요소의 name. 꿈 전체에 대한 질문이면 null"
+        default=None,
+        max_length=50,  # DB 컬럼 interview_questions.target_element가 varchar(50)
+        description="질문 대상 요소의 name. 꿈 전체에 대한 질문이면 null",
     )
     question: str = Field(min_length=1, max_length=200)
 
@@ -38,11 +40,25 @@ def _check_order(items: list, label: str) -> list:
     return items
 
 
+def _check_unique_names(elements: list[ExtractedElement]) -> list[ExtractedElement]:
+    """요소 name이 서로 겹치지 않는지 확인. 장면·질문이 요소를 name으로 가리키므로 겹치면 안 된다."""
+    names = [e.name for e in elements]
+    duplicated = sorted({n for n in names if names.count(n) > 1})
+    if duplicated:
+        raise ValueError(f"요소 name이 겹칩니다. 서로 다른 이름을 붙여 주세요: {duplicated}")
+    return elements
+
+
 class ExtractionResult(BaseModel):
     """extract_and_ask(text)의 결과: 요소 추출 + 되묻기 질문 5~7개."""
 
     elements: list[ExtractedElement]
     questions: list[InterviewQuestion] = Field(min_length=5, max_length=7)
+
+    @field_validator("elements")
+    @classmethod
+    def _unique_names(cls, v: list[ExtractedElement]) -> list[ExtractedElement]:
+        return _check_unique_names(v)
 
     @field_validator("questions")
     @classmethod
@@ -70,6 +86,11 @@ class ReextractionResult(BaseModel):
     """reextract(text, answers)의 결과: 인터뷰 답변을 반영한 요소 목록."""
 
     elements: list[ExtractedElement]
+
+    @field_validator("elements")
+    @classmethod
+    def _unique_names(cls, v: list[ExtractedElement]) -> list[ExtractedElement]:
+        return _check_unique_names(v)
 
 
 class Scene(BaseModel):
