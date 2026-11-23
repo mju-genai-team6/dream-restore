@@ -4,6 +4,8 @@
 ## 1. 장면 나누기
 
 - 장면은 3개 이상 5개 이하로 나눕니다. 꿈 내용이 짧으면 3개로 합니다.
+- 꿈 내용이 짧아 3개가 안 되면 일어난 행동을 더 잘게 나눕니다. (예: "공원을 걷는다" → "비가 내리기 시작한다" → "나무 밑으로 뛰어간다")
+  감정만 보여 주는 장면(예: "당황한 감정을 느낀다")을 따로 만들지 않습니다. 감정은 그 감정을 느낀 장면의 element_names에 넣습니다.
 - 꿈에서 일어난 순서대로 나눕니다. 장소가 바뀌거나 새로운 일이 일어나는 곳에서 나눕니다.
 - 꿈 내용과 답변에 실제로 나온 것만 씁니다. 없는 사건, 인물, 장소, 물건을 지어내지 않습니다.
 - 답변이 "(기억나지 않음)"인 내용은 쓰지 않습니다.
@@ -16,6 +18,8 @@
 - element_names: 이 장면에 나오는 요소의 name 목록. 아래 "요소 목록"에 있는 name을 글자 그대로 씁니다. 목록에 없는 이름은 쓰지 않습니다.
   - 장면에서 사용자가 느낀 감정(emotion 요소)도 해당 장면에 넣습니다.
   - 모든 장면에 요소가 하나 이상 있어야 합니다.
+  - 모든 장면에 인물(person), 장소(place), 물건(object) 요소 중 하나 이상이 있어야 합니다. 감정만 있는 장면은 그림으로 그릴 수 없습니다.
+  - 장소가 바뀌지 않았으면 그 장소를 다음 장면에도 계속 넣습니다. 그 장면에 계속 있는 인물과 물건도 넣습니다.
 - image_prompt_en: 이미지 생성용 영어 프롬프트 (아래 규칙)
 
 ## 2. 이미지 프롬프트 규칙 (image_prompt_en)
@@ -34,6 +38,7 @@
 ## 3. 인물 외형 (characters)
 
 요소 목록에서 type이 person인 요소마다 하나씩 만듭니다. person 요소가 없으면 빈 목록 []으로 둡니다.
+동물이나 물건(type이 object)은 characters에 넣지 않습니다. 사람처럼 행동해도 넣지 않습니다.
 
 - name: 요소 목록의 name을 글자 그대로
 - name_en: image_prompt_en에서 이 인물을 부를 짧은 영어 이름 (예: "the grandmother", "the friend")
@@ -54,6 +59,18 @@
       "summary_ko": "눈 덮인 산길을 삼촌과 함께 걷는다.",
       "element_names": ["산길", "삼촌"],
       "image_prompt_en": "The uncle and the dreamer walk along a snowy mountain trail under a gray sky."
+    },
+    {
+      "order": 2,
+      "summary_ko": "삼촌이 멈춰 서서 빨간 등불을 켠다.",
+      "element_names": ["산길", "삼촌", "등불"],
+      "image_prompt_en": "The uncle stops on the snowy trail and lights a red lantern."
+    },
+    {
+      "order": 3,
+      "summary_ko": "등불을 들고 산장 문 앞에 도착해 안심한다.",
+      "element_names": ["산장", "등불", "안도감"],
+      "image_prompt_en": "The dreamer holds the red lantern in front of the wooden door of a mountain cabin."
     }
   ],
   "characters": [

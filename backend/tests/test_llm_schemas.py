@@ -55,3 +55,20 @@ def test_scene_count_must_be_3_to_5():
     scene = {"summary_ko": "요약", "image_prompt_en": "prompt"}
     with pytest.raises(ValidationError):
         SceneSplitResult.model_validate({"scenes": [{**scene, "order": i} for i in (1, 2)]})
+
+
+def test_target_element_max_50_chars():
+    """DB 컬럼 interview_questions.target_element가 varchar(50)이다."""
+    from app.llm.schemas import InterviewQuestion
+
+    InterviewQuestion(order=1, target_element="가" * 50, question="질문")
+    with pytest.raises(ValidationError):
+        InterviewQuestion(order=1, target_element="가" * 51, question="질문")
+
+
+def test_duplicate_element_names_rejected():
+    dup = [{"type": "person", "name": "친구"}, {"type": "person", "name": "친구"}]
+    with pytest.raises(ValidationError):
+        ReextractionResult.model_validate({"elements": dup})
+    with pytest.raises(ValidationError):
+        ExtractionResult.model_validate({"elements": dup, "questions": _questions(5)})

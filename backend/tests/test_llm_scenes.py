@@ -57,12 +57,22 @@ def test_result_fits_create_scenes_input():
         assert {"order", "summary_ko", "element_names", "image_prompt_en"} <= scene.keys()
 
 
-def test_unknown_element_name_is_retried():
+def test_unknown_element_name_dropped_without_retry():
+    """요소 목록에 없는 이름은 다시 요청하지 않고 버린다. 결과에는 목록에 있는 이름만 남는다."""
     bad = _changed(lambda d: d["scenes"][0]["element_names"].append("없는 요소"))
+    llm = FakeLlm(bad)
+    result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    assert len(llm.calls) == 1
+    names = {e.name for e in ELEMENTS}
+    assert all(n in names for s in result.scenes for n in s.element_names)
+    assert "없는 요소" not in result.scenes[0].element_names
+
+
+def test_scene_with_only_unknown_names_is_retried():
+    bad = _changed(lambda d: d["scenes"][1].update(element_names=["없는 요소"]))
     llm = FakeLlm(bad, GOOD_SCENES)
     split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
     assert len(llm.calls) == 2
-    assert "없는 요소" in llm.calls[1][-1]["content"]
 
 
 def test_scene_without_elements_is_retried():
@@ -77,6 +87,20 @@ def test_missing_character_is_retried():
     llm = FakeLlm(bad, GOOD_SCENES)
     split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
     assert len(llm.calls) == 2
+
+
+def test_non_person_characters_dropped_without_retry():
+    """동물·물건이 characters에 들어오거나 같은 인물이 두 번 오면 다시 요청하지 않고 걸러 낸다."""
+
+    def add_extra(d):
+        d["characters"].append({"name": "우산", "name_en": "the umbrella", "appearance_en": ""})
+        d["characters"].append(dict(d["characters"][0], appearance_en="duplicate"))
+
+    llm = FakeLlm(_changed(add_extra))
+    result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    assert len(llm.calls) == 1
+    assert [c.name for c in result.characters] == ["할머니"]
+    assert result.characters[0].appearance_en != "duplicate"
 
 
 def test_gives_up_after_max_retries():
@@ -115,3 +139,29 @@ def test_timeout_raises_llm_timeout_error(monkeypatch):
         client.openai_complete([{"role": "user", "content": "hi"}])
     assert isinstance(info.value, client.LlmCallError)
     assert isinstance(info.value.__cause__, openai.APITimeoutError)
+
+
+def test_scene_with_only_emotion_is_retried():
+    bad = _changed(lambda d: d["scenes"][0].update(element_names=["두려움"]))
+    llm = FakeLlm(bad, GOOD_SCENES)
+    split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    assert len(llm.calls) == 2
+    assert "인물, 장소, 물건" in llm.calls[1][-1]["content"]
+
+
+def test_emotion_only_scene_allowed_when_no_visible_elements():
+    """요소가 감정뿐이면 지킬 수 없는 규칙이므로 검사하지 않는다."""
+    from app.llm.schemas import ExtractedElement
+
+    only_emotion = [ExtractedElement(type="emotion", name="두려움")]
+    scenes = [{"order": i, "summary_ko": "요약", "element_names": ["두려움"], "image_prompt_en": "p"} for i in (1, 2, 3)]
+    llm = FakeLlm(json.dumps({"scenes": scenes, "characters": []}, ensure_ascii=False))
+    split_scenes(TEXT, ANSWERS, only_emotion, complete=llm)
+    assert len(llm.calls) == 1
+
+
+def test_openai_client_retries_once(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    assert client.get_openai_client().max_retries == client.OPENAI_MAX_RETRIES == 1
