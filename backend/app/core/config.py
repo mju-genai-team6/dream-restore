@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # app/llm (D): 모델 이름은 .env에서 바꿀 수 있음
     llm_model: str = "gpt-4o-mini"
     stt_model: str = "whisper-1"
-    llm_timeout_seconds: int = 30
+    llm_timeout_seconds: int = 60
 
     # fake: 이미지 API 대신 단색 PNG를 저장한다. real일 때만 E2 핸들러가 실제 이미지 API를 부른다
     image_generation_mode: Literal["fake", "real"] = "fake"
