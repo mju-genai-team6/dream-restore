@@ -38,6 +38,7 @@ from tests.llm_fakes import FakeLlm
 from worker.image_gen import generate as image_gen
 from worker.image_gen.config import image_settings as img_cfg
 from worker.image_gen.generate import handle_generate_image
+from worker.postprocess.confidence import confidence_style_for
 
 client = TestClient(app)
 
@@ -121,8 +122,12 @@ def _fail_scene(scene_id: int, error: JobError):
 def test_all_images_succeed_saves_results_and_images_ready(monkeypatch, pending, read_db):
     dream_id = _scenes_ready(monkeypatch)
     assert len(pending) == 3
-    assert all("confidence_style" not in payload for _, payload in pending)
-    assert all(set(payload) == {"scene_id", "version_no", "image_prompt_en", "characters"} for _, payload in pending)
+    assert all(payload["confidence_level"] == "high" for _, payload in pending)
+    assert all(payload["confidence_style"] == confidence_style_for("high") for _, payload in pending)
+    assert all(
+        set(payload) == {"scene_id", "version_no", "image_prompt_en", "characters", "confidence_level", "confidence_style"}
+        for _, payload in pending
+    )
 
     for job_id, payload in pending:
         runner.run_job(job_id, payload)
@@ -182,7 +187,14 @@ def test_failed_scene_keeps_scenes_ready_and_retry_api_regenerates_it(monkeypatc
     assert job["target_id"] == by_scene[failed_scene].id
     assert job["job_id"] != failed_job.id
     assert retried == [
-        {"scene_id": failed_scene, "version_no": 1, "image_prompt_en": "prompt 2", "characters": []}
+        {
+            "scene_id": failed_scene,
+            "version_no": 1,
+            "image_prompt_en": "prompt 2",
+            "characters": [],
+            "confidence_level": "high",
+            "confidence_style": confidence_style_for("high"),
+        }
     ]
     assert client.get(f"/jobs/{job['job_id']}").json()["status"] == "succeeded"
     version = next(v for v in _versions(read_db) if v.scene_id == failed_scene)
@@ -219,8 +231,85 @@ def test_retry_payload_keeps_saved_characters(monkeypatch, pending, read_db):
 
     assert res.status_code == 202, res.text
     assert retried == [
-        {"scene_id": failed_scene, "version_no": 1, "image_prompt_en": "prompt 2", "characters": expected}
+        {
+            "scene_id": failed_scene,
+            "version_no": 1,
+            "image_prompt_en": "prompt 2",
+            "characters": expected,
+            "confidence_level": "high",
+            "confidence_style": confidence_style_for("high"),
+        }
     ]
+
+
+def test_payload_carries_confidence_style_and_retry_keeps_it(monkeypatch, pending, read_db):
+    """시각 요소 확신도는 장면 payload에 실리고, 감정만 있는 장면은 비운 뒤에도 이미지가 만들어진다."""
+    dream_id = client.post("/dreams", json=TEXT).json()["dream_id"]
+    questions = client.get(f"/dreams/{dream_id}/interview").json()["questions"]
+    for question in questions:
+        client.post(f"/dreams/{dream_id}/interview", json={"question_id": question["question_id"], "skipped": True})
+    elements = client.get(f"/dreams/{dream_id}/elements").json()["elements"]
+    chosen = {"학교 복도": "high", "할머니": "medium", "우산": "low", "바다": "high", "두려움": "low", "안도감": "low"}
+    res = client.put(
+        f"/dreams/{dream_id}/elements/confidence",
+        json={"items": [{"element_id": e["element_id"], "confidence": chosen[e["name"]]} for e in elements]},
+    )
+    assert res.status_code == 200, res.text
+
+    def split(text, answers, extracted, complete=None):
+        named = {
+            "high": ["학교 복도"],
+            "medium": ["할머니"],
+            "low": ["우산"],
+            "emotion": ["두려움"],
+        }
+        return SceneSplitResult(
+            scenes=[
+                LlmScene(order=order, summary_ko=f"장면 {name}", element_names=names, image_prompt_en=name)
+                for order, (name, names) in enumerate(named.items(), start=1)
+            ],
+            characters=[],
+        )
+
+    monkeypatch.setattr(scene_jobs, "split_scenes", split)
+    job_id = client.post(f"/dreams/{dream_id}/jobs", json={"type": "generate_scenes"}).json()["job_id"]
+    assert client.get(f"/jobs/{job_id}").json()["status"] == "succeeded"
+
+    by_prompt = {payload["image_prompt_en"]: payload for _, payload in pending}
+    for level in ("high", "medium", "low"):
+        assert by_prompt[level]["confidence_level"] == level
+        assert by_prompt[level]["confidence_style"] == confidence_style_for(level)
+    assert by_prompt["emotion"]["confidence_level"] is None
+    assert by_prompt["emotion"]["confidence_style"] is None
+
+    emotion_job = next(job_id for job_id, payload in pending if payload["image_prompt_en"] == "emotion")
+    emotion_payload = by_prompt["emotion"]
+    runner.run_job(emotion_job, emotion_payload)
+    emotion_version = next(version for version in _versions(read_db) if version.prompt_en == "emotion")
+    assert emotion_version.status == JobStatus.SUCCEEDED
+    assert emotion_version.confidence_level is None
+    assert _status(dream_id) == "scenes_ready"
+
+    medium_scene = next(version.scene_id for version in _versions(read_db) if version.prompt_en == "medium")
+    monkeypatch.setitem(
+        HANDLERS, JobType.GENERATE_IMAGE, _fail_scene(medium_scene, JobError(FailureCode.CONTENT_POLICY, "정책 거부"))
+    )
+    for queued_id, payload in pending:
+        if payload["image_prompt_en"] != "emotion":
+            runner.run_job(queued_id, payload)
+
+    retried: list[dict] = []
+
+    def record(ctx, payload):
+        retried.append(dict(payload))
+        return fake_generate_image(ctx, payload)
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, record)
+    res = client.post(f"/dreams/{dream_id}/images/retry")
+
+    assert res.status_code == 202, res.text
+    assert retried == [by_prompt["medium"]]
+    assert client.get(f"/jobs/{res.json()[0]['job_id']}").json()["status"] == "succeeded"
 
 
 def test_last_two_scenes_finishing_together_transition_once(monkeypatch, pending, read_db):

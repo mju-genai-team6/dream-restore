@@ -59,7 +59,7 @@ def retry_images(db: Session, dream_id: int, background_tasks: BackgroundTasks) 
                 dream_id=dream_id,
                 job_type=JobType.GENERATE_IMAGE,
                 target_id=version.id,
-                payload=image_payload(scene.id, version.version_no, version.prompt_en, characters),
+                payload=image_payload(db, dream_id, version, version.prompt_en, characters),
             )
             summaries.append(job_summary(job))
     return summaries

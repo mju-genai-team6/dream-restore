@@ -110,7 +110,7 @@ def save_scenes(db: Session, job: Job, result: dict) -> list[FollowUp]:
             FollowUp(
                 job_type=JobType.GENERATE_IMAGE,
                 target_id=version.id,
-                payload=image_payload(scene.id, version.version_no, item["image_prompt_en"], characters),
+                payload=image_payload(db, job.dream_id, version, item["image_prompt_en"], characters),
             )
         )
     return followups
