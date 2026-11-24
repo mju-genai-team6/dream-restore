@@ -22,6 +22,10 @@ scripts/            OpenAPI 내보내기
 tests/              pytest
 ```
 
+## API
+
+- 진행 상태는 `GET /jobs/{jobId}`와 `GET /dreams/{id}/scenes`를 주기적으로 조회한다(SSE 없음).
+
 ## 이미지 생성 모드
 
 장면 이미지는 저장소 루트 `.env`의 `IMAGE_GENERATION_MODE`에 따라 만든다.
@@ -75,7 +79,7 @@ def mark_render_failed(db, job, error_code: str | None, error_message: str) -> N
     ...
 ```
 
-- 성공하면 실행기가 후처리 저장과 `succeeded`를 한 번에 commit한 뒤 SSE를 보낸다.
-- 실패하면 `failed`를 먼저 commit하고, 그 다음 `on_failure`가 남긴 변경을 commit한다. `on_failure`가 예외를 내면 traceback만 남기고 실행기는 계속 돈다.
+- 성공하면 실행기가 후처리 저장과 `succeeded`를 한 번에 commit한다.
+- 실패하면 `failed`를 먼저 commit하고, 그 다음 `on_failure`가 남긴 변경을 commit한다. `on_failure`가 예외를 내면 traceback을 남기고, 새 세션에서 작업 종류별 최소 대비책(`runner.FAILURE_FALLBACKS`, 지금은 `generate_image`의 장면 버전 failed)을 실행한 뒤 실행기는 계속 돈다.
 - 꿈 상태 전이는 `ensure_transition`으로 검사한 뒤 `transition_status`로 바꾼다.
 - `on_success`가 실패하면 그 작업은 `failed`가 되고 핸들러는 다시 실행하지 않는다. 이미 만든 영상·이미지를 다시 만들지 않기 위해서다.

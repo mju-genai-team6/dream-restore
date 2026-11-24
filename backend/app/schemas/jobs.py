@@ -25,7 +25,7 @@ class JobError(BaseModel):
 
 
 class JobSummary(BaseModel):
-    """작업 등록·조회 응답, 꿈 조회의 진행 중 작업, SSE 이벤트 data에 쓴다. 퍼센트 값은 두지 않는다."""
+    """작업 등록·조회 응답과 꿈 조회의 진행 중 작업에 쓴다. 퍼센트 값은 두지 않는다."""
 
     model_config = ConfigDict(
         json_schema_extra={

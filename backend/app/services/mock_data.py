@@ -226,13 +226,6 @@ JOB_FAILED_EXAMPLE = {
     "error": {"code": "LLM_SCHEMA", "message": "장면을 만들지 못했습니다. 다시 시도해 주세요."},
 }
 
-JOB_EVENTS = [
-    {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "queued", "stage": None},
-    {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "running", "stage": "splitting"},
-    {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "running", "stage": "prompting"},
-    {"job_id": SCENES_JOB_ID, "type": "generate_scenes", "status": "succeeded", "stage": "prompting"},
-]
-
 SCENES = {
     "scenes": [
         {
