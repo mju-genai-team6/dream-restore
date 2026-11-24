@@ -13,6 +13,7 @@ from app.jobs import runner
 from app.jobs.context import JobError
 from app.jobs.registry import HANDLERS, ON_FAILURE, ON_SUCCESS
 from app.jobs.submit import submit_job
+from app.llm.client import LlmSchemaError
 from app.main import app
 from app.models import Dream
 from app.repositories import jobs as job_repo
@@ -422,3 +423,80 @@ def test_second_run_job_does_nothing(monkeypatch, session_factory, read_db):
     assert job.status == JobStatus.SUCCEEDED
     assert job.attempt == 1
     assert job.started_at is not None
+
+
+def _runner_messages(caplog, level: int) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == "app.jobs.runner" and r.levelno == level]
+
+
+def test_success_logs_start_and_end_lines(monkeypatch, session_factory, caplog):
+    dream_id = _dream()
+    job_id = _job(session_factory, dream_id)
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, lambda ctx, payload: {})
+    monkeypatch.setitem(ON_SUCCESS, JobType.GENERATE_SCENES, lambda db, job, result: None)
+
+    with caplog.at_level(logging.INFO, logger="app.jobs.runner"):
+        runner.run_job(job_id, {})
+
+    fields = f"job_id={job_id} type=generate_scenes dream_id={dream_id}"
+    start, end = _runner_messages(caplog, logging.INFO)
+    assert start == f"작업 시작 {fields} target_id=None"
+    assert end.startswith(f"작업 성공 {fields} status=succeeded attempt=1 elapsed_ms=")
+    assert end.rsplit("=", 1)[1].isdigit()
+
+
+def test_expected_failure_logs_cause_chain_but_keeps_user_message(monkeypatch, session_factory, read_db, caplog):
+    dream_id = _dream()
+    job_id = _job(session_factory, dream_id)
+    long_detail = "요소 이름 " + "가" * 300
+
+    def handle(ctx, payload):
+        try:
+            try:
+                raise ValueError("검사 실패")
+            except ValueError as inner:
+                raise LlmSchemaError(long_detail) from inner
+        except LlmSchemaError as exc:
+            raise JobError(FailureCode.LLM_SCHEMA, "장면을 만들지 못했습니다.") from exc
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+
+    with caplog.at_level(logging.INFO, logger="app.jobs.runner"):
+        runner.run_job(job_id, {})
+
+    [line] = _runner_messages(caplog, logging.WARNING)
+    assert line.startswith(
+        f"작업 실패 job_id={job_id} type=generate_scenes dream_id={dream_id} status=failed "
+        "error_code=LLM_SCHEMA step=handler attempt=1 elapsed_ms="
+    )
+    assert "cause=LlmSchemaError <- ValueError" in line
+    message = line.split(" message=", 1)[1]
+    assert message == long_detail[:200] + "…"
+    [job] = rows.jobs(read_db)
+    assert job.error_message == "장면을 만들지 못했습니다."
+    assert client.get(f"/jobs/{job_id}").json()["error"] == {
+        "code": "LLM_SCHEMA", "message": "장면을 만들지 못했습니다."
+    }
+
+
+def test_unexpected_failure_logs_traceback(monkeypatch, session_factory, caplog):
+    dream_id = _dream()
+    job_id = _job(session_factory, dream_id)
+
+    def handle(ctx, payload):
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(HANDLERS, JobType.GENERATE_SCENES, handle)
+
+    with caplog.at_level(logging.INFO, logger="app.jobs.runner"):
+        runner.run_job(job_id, {})
+
+    [record] = [r for r in caplog.records if r.name == "app.jobs.runner" and r.levelno == logging.ERROR]
+    assert record.getMessage().startswith(
+        f"작업 실패 job_id={job_id} type=generate_scenes dream_id={dream_id} status=failed "
+        "error_code=INTERNAL_ERROR step=handler attempt=1 elapsed_ms="
+    )
+    assert record.exc_info is not None and "boom" in caplog.text and "Traceback" in caplog.text
+    assert client.get(f"/jobs/{job_id}").json()["error"] == {
+        "code": "INTERNAL_ERROR", "message": runner.INTERNAL_ERROR_MESSAGE
+    }

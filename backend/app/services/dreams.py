@@ -35,7 +35,6 @@ from app.schemas.dreams import (
     InterviewProgress,
 )
 from app.schemas.renders import RenderSummary
-from app.services import mock_data
 from app.services.job_views import job_summary
 from app.services.llm_calls import STT_FAILED_MESSAGE, call_stt, dream_lock
 from app.services.scenes import image_url
@@ -50,12 +49,6 @@ _MP4_MAGIC = b"ftyp"  # 4번째 바이트부터
 _MAGIC_BYTES = 8
 _DREAM_JOB_TYPES = frozenset({JobType.GENERATE_SCENES, JobType.RENDER_VIDEO})
 _SUMMARY_PREVIEW_CHARS = 60
-
-
-def ensure_sample_dream(dream_id: int) -> None:
-    """목업 엔드포인트용: dream_id=1 샘플만 있는 것으로 본다."""
-    if dream_id != mock_data.DREAM_ID:
-        raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
 
 
 def _status_response(dream: Dream) -> DreamStatusResponse:
@@ -94,7 +87,7 @@ def get_dream(db: Session, dream_id: int) -> DreamResponse:
         raise NotFound("꿈 기록을 찾을 수 없습니다.", {"dream_id": dream_id})
     answered, total = interview_repo.get_progress(db, dream_id)
     # active_job은 generate_scenes·render_video 중 진행 중인 하나만 담는다.
-    # generate_image 진행은 장면 목록과 SSE에서 보여 준다.
+    # generate_image 진행은 장면 목록(GET /dreams/{id}/scenes)에서 보여 준다.
     # repositories의 정렬 순서에 기대지 않고 (created_at, id)가 가장 큰 작업을 고른다
     active_job = max(
         (job for job in job_repo.get_active_jobs(db, dream_id) if job.type in _DREAM_JOB_TYPES),

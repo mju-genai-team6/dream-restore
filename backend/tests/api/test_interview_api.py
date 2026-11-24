@@ -1,4 +1,5 @@
 """질문 조회·답변 저장 API (C-S2-02)."""
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -194,6 +195,24 @@ def test_llm_timeout_returns_504(monkeypatch):
     res = client.get(f"/dreams/{dream_id}/interview")
     assert res.status_code == 504
     assert res.json()["error"]["code"] == "UPSTREAM_TIMEOUT"
+
+
+@pytest.mark.parametrize(
+    ("mode", "status", "code", "cause"),
+    [("bad_format", 502, "LLM_FAILED", "LlmSchemaError"), ("timeout", 504, "UPSTREAM_TIMEOUT", "LlmTimeoutError")],
+)
+def test_llm_failure_logs_cause_and_keeps_user_message(monkeypatch, caplog, mode, status, code, cause):
+    monkeypatch.setattr(llm_client, "openai_complete", FakeLlm(mode=mode))
+    dream_id = _text_dream()
+
+    with caplog.at_level(logging.WARNING, logger="app.services.llm_calls"):
+        res = client.get(f"/dreams/{dream_id}/interview")
+
+    [line] = [r.getMessage() for r in caplog.records if r.name == "app.services.llm_calls"]
+    assert f"status={status} error_code={code} cause={cause}" in line
+    assert len(line.split(" message=", 1)[1]) <= 201
+    assert res.status_code == status
+    assert "cause" not in res.text and cause not in res.text
 
 
 def test_concurrent_first_get_calls_llm_once(monkeypatch, read_db):

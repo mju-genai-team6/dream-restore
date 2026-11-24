@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from app.api import dreams, elements, events, interview, jobs, renders, scenes
+from app.api import dreams, elements, interview, jobs, renders, scenes
 
 router = APIRouter()
-for module in (dreams, interview, elements, jobs, events, scenes, renders):
+for module in (dreams, interview, elements, jobs, scenes, renders):
     router.include_router(module.router)
 
 # 선택 기능 (S4): world, evaluations, revisions

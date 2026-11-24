@@ -6,7 +6,6 @@ sqlalchemy>=2
 psycopg[binary]
 alembic
 python-multipart
-sse-starlette
 httpx
 Pillow
 openai>=3,<4

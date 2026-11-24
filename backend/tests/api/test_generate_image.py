@@ -24,13 +24,14 @@ from app.jobs.context import JobError
 from app.jobs.handlers import images as image_jobs
 from app.jobs.handlers import scenes as scene_jobs
 from app.jobs.handlers.images import fake_generate_image
-from app.jobs.registry import HANDLERS
+from app.jobs.registry import HANDLERS, ON_FAILURE
 from app.llm import client as llm_client
 from app.llm.schemas import Scene as LlmScene
 from app.llm.schemas import SceneCharacter, SceneSplitResult
 from app.main import app
 from app.models import Dream, Scene, SceneVersion
 from app.repositories import dreams as dream_repo
+from app.repositories import jobs as job_repo
 from app.repositories import scenes as scene_repo
 from tests.api import rows
 from tests.llm_fakes import FakeLlm
@@ -476,3 +477,101 @@ def test_fake_handler_does_not_overwrite(monkeypatch, pending, read_db):
     assert target.read_bytes() == b"old"
     job = next(row for row in _image_jobs(read_db) if row.id == job_id)
     assert (job.status, job.error_code) == ("failed", "INVALID_INPUT")
+
+
+def _raise_on_failure(db, job, error_code, error_message):
+    raise RuntimeError("후처리 실패")
+
+
+def test_interrupted_image_jobs_fail_versions_and_retry_regenerates(
+    monkeypatch, pending, read_db, session_factory: sessionmaker[Session], caplog
+):
+    """장면 생성 commit 뒤(queued)나 실행 중(running)에 꺼져도, 재시작 후 다시 만들기로 images_ready까지 간다."""
+    dream_id = _scenes_ready(monkeypatch)
+    running_id = pending[0][0]
+    with session_factory.begin() as db:
+        assert job_repo.claim_job(db, running_id)
+
+    with caplog.at_level(logging.WARNING, logger="app.jobs.runner"):
+        assert runner.recover_interrupted() == 3
+
+    assert f"작업 중단 처리 job_id={running_id} type=generate_image dream_id={dream_id}" in caplog.text
+    assert {(row.status, row.error_code) for row in _image_jobs(read_db)} == {("failed", "INTERRUPTED")}
+    assert [(v.status, v.image_path) for v in _versions(read_db)] == [(JobStatus.FAILED, None)] * 3
+    assert _status(dream_id) == "scenes_ready"
+    scenes = client.get(f"/dreams/{dream_id}/scenes").json()["scenes"]
+    assert [(scene["status"], scene["active_job"]) for scene in scenes] == [("failed", None)] * 3
+
+    res = client.post(f"/dreams/{dream_id}/images/retry")
+
+    assert res.status_code == 202, res.text
+    assert len(res.json()) == 3
+    assert all(client.get(f"/jobs/{job['job_id']}").json()["status"] == "succeeded" for job in res.json())
+    assert _status(dream_id) == "images_ready"
+
+
+def test_on_failure_error_falls_back_to_failed_version(monkeypatch, pending, read_db, caplog):
+    """실패 후처리가 예외를 내도 장면 버전은 failed가 되고, 다시 만들기 API로 queued가 된다."""
+    dream_id = _scenes_ready(monkeypatch)
+    failed_scene = _versions(read_db)[1].scene_id
+    monkeypatch.setitem(
+        HANDLERS, JobType.GENERATE_IMAGE, _fail_scene(failed_scene, JobError(FailureCode.CONTENT_POLICY, "정책 거부"))
+    )
+    monkeypatch.setitem(ON_FAILURE, JobType.GENERATE_IMAGE, _raise_on_failure)
+
+    with caplog.at_level(logging.WARNING, logger="app.jobs.runner"):
+        for job_id, payload in pending:
+            runner.run_job(job_id, payload)
+
+    assert "작업 실패 후처리 오류" in caplog.text
+    assert "후처리 실패" in caplog.text
+    assert "작업 실패 후처리 대비책 실행" in caplog.text
+    version = next(v for v in _versions(read_db) if v.scene_id == failed_scene)
+    assert (version.status, version.image_path) == (JobStatus.FAILED, None)
+    assert _status(dream_id) == "scenes_ready"
+
+    scheduled: list[int] = []
+    monkeypatch.setattr(runner, "schedule", lambda background_tasks, job_id, payload=None: scheduled.append(job_id))
+    res = client.post(f"/dreams/{dream_id}/images/retry")
+
+    assert res.status_code == 202, res.text
+    [job] = res.json()
+    assert (job["target_id"], job["status"]) == (version.id, "queued")
+    assert scheduled == [job["job_id"]]
+    assert next(v for v in _versions(read_db) if v.scene_id == failed_scene).status == JobStatus.QUEUED
+
+
+def test_interrupted_image_on_failure_error_falls_back(monkeypatch, pending, read_db):
+    """재시작 때 부르는 실패 후처리가 예외를 내도 같은 대비책으로 장면 버전이 failed가 된다."""
+    dream_id = _scenes_ready(monkeypatch)
+    monkeypatch.setitem(ON_FAILURE, JobType.GENERATE_IMAGE, _raise_on_failure)
+
+    assert runner.recover_interrupted() == 3
+
+    assert [v.status for v in _versions(read_db)] == [JobStatus.FAILED] * 3
+    res = client.post(f"/dreams/{dream_id}/images/retry")
+    assert res.status_code == 202, res.text
+    assert _status(dream_id) == "images_ready"
+
+
+def test_fallback_error_is_logged_and_next_job_continues(monkeypatch, pending, read_db, caplog):
+    """대비책도 실패하면 ERROR 로그만 남기고 다음 작업을 이어서 처리한다."""
+    _scenes_ready(monkeypatch)
+    first_version = _versions(read_db)[0].id
+    monkeypatch.setitem(ON_FAILURE, JobType.GENERATE_IMAGE, _raise_on_failure)
+    original = runner.FAILURE_FALLBACKS[JobType.GENERATE_IMAGE]
+
+    def fallback(db, target_id):
+        if target_id == first_version:
+            raise RuntimeError("대비책 실패")
+        original(db, target_id)
+
+    monkeypatch.setitem(runner.FAILURE_FALLBACKS, JobType.GENERATE_IMAGE, fallback)
+
+    with caplog.at_level(logging.ERROR, logger="app.jobs.runner"):
+        assert runner.recover_interrupted() == 3
+
+    failures = [r for r in caplog.records if "대비책도 실패" in r.getMessage()]
+    assert len(failures) == 1 and failures[0].levelno == logging.ERROR
+    assert f"target_id={first_version}" in failures[0].getMessage()
+    assert [v.status for v in _versions(read_db)] == [JobStatus.QUEUED, JobStatus.FAILED, JobStatus.FAILED]
