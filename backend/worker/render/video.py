@@ -358,7 +358,7 @@ def _build_filter_complex(
             f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
             f"d={frames}:s={w}x{h}:fps={fps},"
             f"trim=duration={dur:.3f},setpts=PTS-STARTPTS,"
-            f"format=yuv420p,settb=AVTB"
+            f"format=yuv420p,settb=AVTB,fps={fps}"  # FFmpeg 7.x xfade는 고정 프레임레이트 정보가 필요 (Docker apt 버전)
             f"[v{idx}]"
         )
         parts.append(chain)
