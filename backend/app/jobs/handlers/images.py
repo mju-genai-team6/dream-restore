@@ -1,6 +1,6 @@
 """generate_image 작업 연결 (C-S3-02). 실제 핸들러는 E2(worker/image_gen/generate.py), 저장은 후처리에서 한다.
 
-- payload는 E2 입력 형식(image_payload). confidence_style은 넘기지 않는다(확신도는 E1 블러로만 표현)
+- payload는 E2 입력 형식(image_payload). confidence_level은 항상 넣고, 스타일 문구는 설정이 켜져 있을 때만 넣는다
 - 성공 후처리: 꿈 행을 잠근 뒤 결과와 장면 확신도를 한 번에 저장하고, 모든 장면이 끝났으면 images_ready
 - 실패 후처리: 장면 버전 failed. 꿈은 scenes_ready 그대로 두고 POST /dreams/{id}/images/retry로 다시 만든다
 - settings.image_generation_mode가 fake면 서버 시작 때 가짜 핸들러를 등록한다(install_image_handler)
@@ -14,6 +14,7 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.enums import DreamStatus, FailureCode, JobStage, JobType
 from app.jobs.context import JobContext, JobError
 from app.jobs.registry import HANDLERS, Handler, on_failure, on_success
@@ -31,6 +32,7 @@ from worker.image_gen.prompt import Character, build_prompt
 from worker.postprocess.confidence import (
     ConfidenceInputError,
     aggregate_scene_confidence,
+    confidence_style_for,
 )
 
 ImageMode = Literal["fake", "real"]
@@ -43,13 +45,28 @@ FAKE_COLORS = [(72, 61, 139), (46, 139, 87), (178, 34, 34), (218, 165, 32), (70,
 logger = logging.getLogger(__name__)
 
 
-def image_payload(scene_id: int, version_no: int, prompt_en: str, characters: list[dict]) -> dict:
-    """E2 handle_generate_image 입력. 장면 생성 후처리와 다시 생성 API가 같이 쓴다."""
+def image_payload(
+    db: Session, dream_id: int, version: SceneVersion, prompt_en: str, characters: list[dict]
+) -> dict:
+    """E2 handle_generate_image 입력. 장면 생성 후처리와 다시 생성 API가 같이 쓴다.
+
+    장면 확신도 단계는 성공 후처리와 같은 _scene_confidence로 구한다. 계산할 수 없으면 None이다.
+    confidence_style은 settings.confidence_prompt_style이 켜져 있고 단계가 있을 때만 문구가 된다.
+    """
+    level = _scene_confidence(db, dream_id, version)
+    style = None
+    if settings.confidence_prompt_style and level is not None:
+        try:
+            style = confidence_style_for(level)
+        except ConfidenceInputError as exc:
+            logger.warning("장면 버전 %s의 확신도 스타일 문구를 만들지 못해 비워 둡니다: %s", version.id, exc)
     return {
-        "scene_id": scene_id,
-        "version_no": version_no,
+        "scene_id": version.scene_id,
+        "version_no": version.version_no,
         "image_prompt_en": prompt_en,
         "characters": characters,
+        "confidence_level": level,
+        "confidence_style": style,
     }
 
 
@@ -112,12 +129,13 @@ def _scene_order(scene_id: int) -> int:
         return 0 if scene is None else scene.order
 
 
-def _fake_png(dream_id: int, order: int, version_no: int) -> Image.Image:
+def _fake_png(dream_id: int, order: int, version_no: int, confidence_level: str | None) -> Image.Image:
     width, height = (int(n) for n in img_cfg.image_size.split("x"))
     image = Image.new("RGB", (width, height), FAKE_COLORS[(order - 1) % len(FAKE_COLORS)])
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default(size=height // 12)
-    lines = ["FAKE IMAGE", f"dream {dream_id} · scene {order} · v{version_no}"]
+    level = confidence_level if confidence_level else "none"
+    lines = ["FAKE IMAGE", f"dream {dream_id} · scene {order} · v{version_no} · {level}"]
     draw.multiline_text(
         (width // 2, height // 2), "\n".join(lines), fill=(255, 255, 255), font=font, anchor="mm", align="center"
     )
@@ -139,7 +157,8 @@ def fake_generate_image(ctx: JobContext, payload: dict) -> dict:
     final_prompt = build_prompt(str(payload["image_prompt_en"]), characters=characters, style=payload.get("style_prompt"))
 
     ctx.report_stage(JobStage.REQUESTING)
-    image = _fake_png(ctx.dream_id, _scene_order(scene_id), version_no)
+    level = payload.get("confidence_level")
+    image = _fake_png(ctx.dream_id, _scene_order(scene_id), version_no, level if isinstance(level, str) else None)
 
     ctx.report_stage(JobStage.SAVING)
     tmp_file = ctx.tmp_dir() / f"scene_{scene_id}_v{version_no}.png"
