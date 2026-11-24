@@ -59,10 +59,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 - 오류는 서버가 준 `message`를 그대로 보여 줍니다(`docs/rules/error-format.md`). 서버에 닿지 못했거나 2분 넘게 응답이 없을 때만 화면에서 문구를 만듭니다.
 - 음성 업로드, 첫 질문 조회, 첫 요소 조회는 요청 안에서 AI 응답을 기다리므로 로딩 문구에 걸리는 시간을 적었습니다.
 - 질문 조회 응답에는 답변 내용이 없습니다. 그래서 내가 쓴 답은 브라우저 탭(sessionStorage)에만 두고, 탭을 닫았다 다시 열면 '답변함'으로만 보입니다.
-- 장면 생성 요청 뒤에는 `api.ts`의 `resultsPath()` 주소로 이동합니다. 지금은 `/?dreamId={id}&jobId={jobId}`이고, `jobId`는 `POST /dreams/{id}/jobs`가 돌려준 값입니다.
+- 장면 생성 요청 뒤에는 `api.ts`의 `resultsPath()` 주소인 `/?dreamId={id}&jobId={jobId}`로 이동합니다. `jobId`는 `POST /dreams/{id}/jobs`가 돌려준 값이고, B2 결과 화면이 이 주소를 그대로 받아 진행 상태와 장면을 보여 줍니다.
 
 ## 남은 일
 
-- B2 결과 화면이 주소의 `dreamId`, `jobId`로 해당 꿈의 진행 상태와 장면을 보여 주도록 연결되면, 정해진 주소에 맞춰 `resultsPath()`를 바꿉니다.
 - `Confidence`, `DreamStatus` 타입과 `Icon.tsx`는 B2와 겹치므로 공통 위치로 옮길 예정입니다.
 - 실제 iOS Safari 기기에서의 녹음과 실제 STT, LLM 키를 넣은 서버에서의 확인이 남았습니다.
