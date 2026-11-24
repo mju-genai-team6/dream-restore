@@ -77,8 +77,6 @@ dream-restore/
 
 ## 시작 방법
 
-> 아직 코드가 없는 초기 단계입니다. 각 모듈이 만들어지면 이 절을 실제 명령어로 갱신해 주세요.
-
 ### 1. 저장소 받기
 
 ```bash
@@ -88,10 +86,19 @@ cd dream-restore
 
 ### 2. 환경 변수 설정
 
-`.env.example`(추가 예정)을 복사해 `.env`를 만들고 각자 발급받은 키를 채웁니다. `.env`는 절대 커밋하지 않습니다.
+`.env.example`을 복사해 `.env`를 만들고 각자 발급받은 키를 채웁니다. `.env`는 절대 커밋하지 않습니다.
 
 ```bash
-cp .env.example .env
+cp .env.example .env              # Windows PowerShell: copy .env.example .env
+```
+
+- `main`을 받은 뒤에는 `.env.example`에 새로 생긴 키가 있는지 확인하고 내 `.env`에도 추가합니다. (예: `IMAGE_GENERATION_MODE`, `TTS_FAKE`)
+- 값이 바뀐 키도 `.env`에 직접 반영해야 합니다. `.env`에 적힌 값이 기본값보다 먼저 쓰입니다. (예: `LLM_TIMEOUT_SECONDS=30`)
+
+프론트엔드를 백엔드에 연결하려면 `frontend/.env.local` 파일을 만들고 다음 한 줄을 넣습니다. 이 파일이 없으면 기록 화면과 결과 화면이 서버 대신 예시 데이터로 동작합니다.
+
+```
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
 ### 3. 사전 설치
@@ -126,7 +133,9 @@ docker compose ps        # db 상태가 healthy인지 확인
 ```bash
 # 백엔드
 cd backend
-python -m venv .venv
+python -m venv .venv          # macOS/Linux에서 python이 없으면 python3 -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux는 위 줄 대신 이 줄
 pip install -r requirements-dev.txt
 alembic upgrade head
 uvicorn app.main:app --reload
@@ -134,11 +143,16 @@ pytest                   # DB 테스트는 dream_test에서 돌고, 테스트마
 ```
 
 ```bash
-# 프론트엔드
+# 프론트엔드 (frontend/.env.local을 먼저 만들어 둡니다)
 cd frontend
 npm install
-npm run dev
+npm run dev                # Windows PowerShell에서 막히면 npm.cmd run dev
 ```
+
+- 백엔드를 새 터미널에서 다시 켤 때마다 `.venv` 활성화부터 합니다. 프롬프트 앞에 `(.venv)`가 보이면 활성화된 상태입니다.
+- Windows PowerShell에서 활성화할 때 "스크립트를 실행할 수 없으므로" 오류가 나면 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`를 한 번 실행한 뒤 다시 활성화합니다.
+- `frontend/.env.local`을 만들거나 고친 뒤 반영되지 않으면 `npm run dev`를 껐다 다시 켭니다.
+- 브라우저에서 `http://localhost:3000`을 열어 **서버 조회 모드**가 표시되면 백엔드와 연결된 것입니다.
 
 ## 협업 규칙
 

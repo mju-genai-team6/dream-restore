@@ -24,12 +24,19 @@ npm.cmd run dev
 
 ## 기록·결과·보관함을 팀 API에 연결하기
 
-팀 백엔드를 먼저 실행한 뒤, 이 폴더의 PowerShell에서 다음을 실행합니다.
+팀 백엔드를 먼저 실행한 뒤, 이 폴더(`frontend`)에 `.env.local` 파일을 만들고 다음 한 줄을 넣습니다. `.env.local`은 커밋되지 않습니다.
 
-```powershell
-$env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000"
-npm.cmd run dev
 ```
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+그다음 개발 서버를 실행합니다. 이미 켜져 있었는데 주소가 반영되지 않으면 껐다가 다시 켭니다.
+
+```
+npm run dev                # Windows PowerShell에서 막히면 npm.cmd run dev
+```
+
+잠깐만 서버에 붙여 보고 싶다면 파일 대신 환경 변수로 지정해도 됩니다. Windows PowerShell은 `$env:NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000"`을 먼저 실행하고, macOS/Linux는 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev`로 실행합니다. 이 방법은 그 터미널을 닫으면 사라집니다.
 
 `http://localhost:3000`에서 **서버 조회 모드**가 표시되면 보관함에서 꿈을 선택하고 **장면 열기**를 누릅니다. **꿈 기록하기**에서 기록을 마쳐도 해당 꿈의 결과 화면으로 이동합니다. 새 DB 변경을 받았다면 백엔드 환경에서 `alembic upgrade head`를 먼저 실행합니다.
 
