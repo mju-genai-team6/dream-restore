@@ -13,7 +13,7 @@
 | 파일 | 내용 |
 | --- | --- |
 | `generate.py` | `handle_generate_image` (`@register(JobType.GENERATE_IMAGE)`), 장면 1개 = 작업 1개 |
-| `prompt.py` | 프롬프트 조합: 공통 화풍 → 장면 내용 → 인물 외형 (→ 확신도 스타일: 실험·E1 테스트용, 파이프라인에서는 쓰지 않음) |
+| `prompt.py` | 프롬프트 조합: 공통 화풍 → 장면 내용 → 인물 외형 (→ 확신도 스타일: payload에 있을 때만) |
 | `config.py` | 이미지 생성 설정 (공용 `app/core/config.py`와 같은 `.env`를 읽음) |
 
 ### payload (C가 Job API에서 넣어 줄 값)
@@ -48,8 +48,9 @@
   `name, age_range, hair, outfit, features`를 그대로 `characters`에 넣어 주세요.
 - 이미지 프롬프트는 영어이므로 B2 등록 화면의 외형 입력도 영어 문구를 권장합니다. 한국어도 동작은 하지만 결과가 덜 정확할 수 있습니다.
 
-**확신도는 넣지 않습니다.** 이미지는 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현합니다 (E1 합의).
-스토리보드는 원본을, 영상은 블러를 적용한 이미지를 씁니다. payload에 `confidence_style`이 들어와도 무시하고 경고 로그만 남깁니다.
+**확신도 스타일 (선택)**: payload에 `confidence_style` 문장이 있으면 프롬프트 맨 뒤에 `Memory clarity: ...`로 붙입니다
+(문구는 E1 `confidence_style_for`가 정하고 C가 payload에 넣음). 없거나 비어 있으면 붙이지 않아 선명한 원본 프롬프트가 됩니다.
+블러 후처리(E1)와 겹치는지는 사용자 테스트에서 확인합니다.
 
 ### 반환값 (장면 버전에 기록)
 

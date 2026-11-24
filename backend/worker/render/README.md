@@ -10,6 +10,7 @@
   - 결과: `narration_path`, `duration_seconds`(mutagen으로 측정), `text`, `model`, `voice`, `speed`, `attempts`, `generated_at`
   - 이미지와 같은 버전 폴더(`v{n}/narration.mp3`)에 저장, 기존 파일은 덮어쓰지 않음
   - 기본값: `gpt-4o-mini-tts`, 음성 `sage`, 속도 0.95 — `.env`의 `TTS_MODEL`, `TTS_VOICE`, `TTS_SPEED`로 변경
+  - 가짜 모드: `.env`에 `TTS_FAKE=true`면 API 없이 글자 수(글자당 0.15초, 최소 1초)에 맞춘 무음 mp3를 저장한다. 결과의 `fake`가 true
   - 시간 초과·일시적 오류는 최대 2회 재시도. 테스트: `pytest tests/test_narration.py`
 
 ## 구현 모듈 (E1 렌더링)
