@@ -148,3 +148,25 @@ def test_invalid_payload(ctx, use_client, payload):
     with pytest.raises(JobError) as e:
         narration.handle_generate_narration(ctx, payload)
     assert e.value.code == FailureCode.INVALID_INPUT
+
+
+def test_fake_mode_makes_silent_mp3_without_api(ctx, monkeypatch):
+    """TTS_FAKE=true면 API(클라이언트)를 만들지 않고 글자 수에 맞는 무음 mp3를 저장한다."""
+    monkeypatch.setattr(narration.tts_settings, "tts_fake", True)
+
+    def no_client():
+        raise AssertionError("가짜 모드에서는 클라이언트를 만들면 안 됩니다")
+
+    monkeypatch.setattr(narration, "get_client", no_client)
+    result = narration.handle_generate_narration(ctx, PAYLOAD)
+    target = ctx.root / TARGET
+    assert target.is_file()
+    assert result["fake"] is True and result["attempts"] == 0
+    assert result["duration_seconds"] == pytest.approx(len(PAYLOAD["text"]) * 0.15, abs=0.1)
+    assert narration.mp3_duration(target) == result["duration_seconds"]
+
+
+def test_fake_mode_short_text_is_at_least_one_second(ctx, monkeypatch):
+    monkeypatch.setattr(narration.tts_settings, "tts_fake", True)
+    result = narration.handle_generate_narration(ctx, {**PAYLOAD, "text": "네"})
+    assert result["duration_seconds"] >= 1.0

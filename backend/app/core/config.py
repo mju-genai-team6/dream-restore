@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     job_max_retries: int = 2  # JobError(retryable=True)일 때 자동 재시도 횟수
     job_retry_delay_seconds: float = 2.0
     audio_max_mb: int = 25
+    confidence_prompt_style: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

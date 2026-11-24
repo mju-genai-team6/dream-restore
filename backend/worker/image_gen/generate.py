@@ -11,11 +11,10 @@ payload (Job API가 넣어 줌):
                                세계관 인물이면 world_entities 항목을 그대로 넣는다 (계획서 2장 선택 기능)
                                {"name", "age_range", "hair", "outfit", "features", "appearance"(선택, 이번 꿈에서만 다른 점)}
     style_prompt: str          (선택) 꿈 전체 공통 화풍. 없으면 기본 화풍
+    confidence_style: str      (선택) 확신도 스타일 문구 (C가 E1 confidence_style_for 결과를 넣음).
+                               있으면 프롬프트 맨 뒤에 "Memory clarity: ..."로 붙인다. 없으면 선명한 원본 프롬프트
 
-확신도는 받지 않는다. 항상 선명한 원본만 만들고, 확신도는 E1 블러 후처리로만 표현한다 (E1 합의).
-- 스토리보드는 원본을 보여 주고 블러는 렌더링 단계에서만 적용 (C 계획서)
-- 생성 단계에서 흐리게 만들면 E1 블러와 겹치고, 원본(no_blur) vs 블러(blur) 비교가 어려워짐
-payload에 confidence_style이 들어와도 무시하고 경고만 남긴다.
+확신도 문구는 E1이 정하고 E2는 받은 문구를 붙이기만 한다 (prompt.py). 비어 있으면 넣지 않는다.
 
 결과 (장면 버전에 기록할 값):
     image_path, final_prompt, model, settings, seed, attempts, elapsed_seconds, generated_at
@@ -150,11 +149,15 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
     if target.exists():
         raise JobError(FailureCode.INVALID_INPUT, f"이미 있는 장면 버전입니다: v{version_no} (원본은 덮어쓰지 않음)")
 
-    if payload.get("confidence_style"):
-        ctx.logger.warning("confidence_style은 무시합니다. 확신도는 E1 블러로만 표현합니다 (scene=%s)", scene_id)
-
-    # confidence_style을 넘기지 않으므로 항상 선명한 원본
-    final_prompt = build_prompt(scene_prompt, characters=characters, style=payload.get("style_prompt"))
+    confidence_style = payload.get("confidence_style")
+    if confidence_style is not None and not isinstance(confidence_style, str):
+        raise JobError(FailureCode.INVALID_INPUT, "confidence_style은 문자열이어야 합니다.")
+    final_prompt = build_prompt(
+        scene_prompt,
+        characters=characters,
+        style=payload.get("style_prompt"),
+        confidence_style=confidence_style,
+    )
 
     ctx.report_stage(JobStage.REQUESTING)
     ctx.logger.info("이미지 생성 요청 scene=%s v%s model=%s", scene_id, version_no, img_cfg.openai_image_model)

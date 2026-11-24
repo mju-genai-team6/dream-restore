@@ -1,6 +1,6 @@
 """generate_image 작업 연결 (C-S3-02). 실제 핸들러는 E2(worker/image_gen/generate.py), 저장은 후처리에서 한다.
 
-- payload는 E2 입력 형식(image_payload). 장면 확신도 단계와 스타일 문구를 함께 넣는다
+- payload는 E2 입력 형식(image_payload). confidence_level은 항상 넣고, 스타일 문구는 설정이 켜져 있을 때만 넣는다
 - 성공 후처리: 꿈 행을 잠근 뒤 결과와 장면 확신도를 한 번에 저장하고, 모든 장면이 끝났으면 images_ready
 - 실패 후처리: 장면 버전 failed. 꿈은 scenes_ready 그대로 두고 POST /dreams/{id}/images/retry로 다시 만든다
 - settings.image_generation_mode가 fake면 서버 시작 때 가짜 핸들러를 등록한다(install_image_handler)
@@ -14,6 +14,7 @@ from typing import Literal
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.enums import DreamStatus, FailureCode, JobStage, JobType
 from app.jobs.context import JobContext, JobError
 from app.jobs.registry import HANDLERS, Handler, on_failure, on_success
@@ -49,16 +50,16 @@ def image_payload(
 ) -> dict:
     """E2 handle_generate_image 입력. 장면 생성 후처리와 다시 생성 API가 같이 쓴다.
 
-    장면 확신도는 성공 후처리와 같은 _scene_confidence로 구한다. 계산할 수 없으면 두 키 모두 None이다.
+    장면 확신도 단계는 성공 후처리와 같은 _scene_confidence로 구한다. 계산할 수 없으면 None이다.
+    confidence_style은 settings.confidence_prompt_style이 켜져 있고 단계가 있을 때만 문구가 된다.
     """
     level = _scene_confidence(db, dream_id, version)
     style = None
-    if level is not None:
+    if settings.confidence_prompt_style and level is not None:
         try:
             style = confidence_style_for(level)
         except ConfidenceInputError as exc:
             logger.warning("장면 버전 %s의 확신도 스타일 문구를 만들지 못해 비워 둡니다: %s", version.id, exc)
-            level = None
     return {
         "scene_id": version.scene_id,
         "version_no": version.version_no,

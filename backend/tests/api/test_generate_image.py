@@ -123,7 +123,7 @@ def test_all_images_succeed_saves_results_and_images_ready(monkeypatch, pending,
     dream_id = _scenes_ready(monkeypatch)
     assert len(pending) == 3
     assert all(payload["confidence_level"] == "high" for _, payload in pending)
-    assert all(payload["confidence_style"] == confidence_style_for("high") for _, payload in pending)
+    assert all(payload["confidence_style"] is None for _, payload in pending)
     assert all(
         set(payload) == {"scene_id", "version_no", "image_prompt_en", "characters", "confidence_level", "confidence_style"}
         for _, payload in pending
@@ -193,7 +193,7 @@ def test_failed_scene_keeps_scenes_ready_and_retry_api_regenerates_it(monkeypatc
             "image_prompt_en": "prompt 2",
             "characters": [],
             "confidence_level": "high",
-            "confidence_style": confidence_style_for("high"),
+            "confidence_style": None,
         }
     ]
     assert client.get(f"/jobs/{job['job_id']}").json()["status"] == "succeeded"
@@ -237,7 +237,7 @@ def test_retry_payload_keeps_saved_characters(monkeypatch, pending, read_db):
             "image_prompt_en": "prompt 2",
             "characters": expected,
             "confidence_level": "high",
-            "confidence_style": confidence_style_for("high"),
+            "confidence_style": None,
         }
     ]
 
@@ -278,7 +278,7 @@ def test_payload_carries_confidence_style_and_retry_keeps_it(monkeypatch, pendin
     by_prompt = {payload["image_prompt_en"]: payload for _, payload in pending}
     for level in ("high", "medium", "low"):
         assert by_prompt[level]["confidence_level"] == level
-        assert by_prompt[level]["confidence_style"] == confidence_style_for(level)
+        assert by_prompt[level]["confidence_style"] is None
     assert by_prompt["emotion"]["confidence_level"] is None
     assert by_prompt["emotion"]["confidence_style"] is None
 
@@ -304,11 +304,14 @@ def test_payload_carries_confidence_style_and_retry_keeps_it(monkeypatch, pendin
         retried.append(dict(payload))
         return fake_generate_image(ctx, payload)
 
+    monkeypatch.setattr(settings, "confidence_prompt_style", True)
     monkeypatch.setitem(HANDLERS, JobType.GENERATE_IMAGE, record)
     res = client.post(f"/dreams/{dream_id}/images/retry")
 
     assert res.status_code == 202, res.text
-    assert retried == [by_prompt["medium"]]
+    [retried_payload] = retried
+    assert retried_payload["confidence_level"] == "medium"
+    assert retried_payload["confidence_style"] == confidence_style_for("medium")
     assert client.get(f"/jobs/{res.json()[0]['job_id']}").json()["status"] == "succeeded"
 
 

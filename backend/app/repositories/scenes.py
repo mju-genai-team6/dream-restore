@@ -7,7 +7,7 @@ from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import ElementType, JobStatus
-from app.models import DreamElement, Scene, SceneVersion
+from app.models import DreamElement, Scene, SceneVersion, WorldEntity
 from app.repositories import InvalidData
 from app.repositories.extractions import list_elements
 
@@ -164,6 +164,8 @@ def list_scene_characters(db: Session, scene_version_id: int) -> list[dict] | No
 
     [{"name": name_en, "appearance": appearance_en}, ...] — 장면의 element_ids 순서.
     인물(person) 요소 중 name_en이 저장된 것만 (set_character_appearances 전이면 빈 목록).
+    세계관 인물에 연결된 요소(entity_id)는 world_entities의 age_range, hair, outfit, features도 함께 준다
+    (비어 있는 항목은 None). E2의 from_world_entity가 등록 외형을 먼저, 이 꿈의 appearance를 뒤에 붙인다.
     장면 버전이 없으면 None.
     """
     version = db.get(SceneVersion, scene_version_id)
@@ -182,7 +184,21 @@ def list_scene_characters(db: Session, scene_version_id: int) -> list[dict] | No
             )
         )
     }
-    return [{"name": people[i].name_en, "appearance": people[i].appearance_en} for i in ids if i in people]
+    entity_ids = {e.entity_id for e in people.values() if e.entity_id is not None}
+    entities = (
+        {w.id: w for w in db.scalars(select(WorldEntity).where(WorldEntity.id.in_(entity_ids)))} if entity_ids else {}
+    )
+    result = []
+    for i in ids:
+        if i not in people:
+            continue
+        person = people[i]
+        item = {"name": person.name_en, "appearance": person.appearance_en}
+        entity = entities.get(person.entity_id)
+        if entity is not None:
+            item.update(age_range=entity.age_range, hair=entity.hair, outfit=entity.outfit, features=entity.features)
+        result.append(item)
+    return result
 
 
 def list_scenes(db: Session, dream_id: int) -> list[Scene]:

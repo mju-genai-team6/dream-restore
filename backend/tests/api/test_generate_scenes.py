@@ -18,7 +18,6 @@ from app.models import Dream, Scene, SceneVersion
 from app.repositories import jobs as job_repo
 from tests.api import rows
 from tests.llm_fakes import FakeLlm
-from worker.postprocess.confidence import confidence_style_for
 
 client = TestClient(app)
 
@@ -40,7 +39,7 @@ def image_calls(monkeypatch) -> list[dict]:
 
     def fake(ctx, payload):
         assert payload["confidence_level"] == "high"
-        assert payload["confidence_style"] == confidence_style_for("high")
+        assert payload["confidence_style"] is None
         with runner.session_factory() as db:
             dream = db.get(Dream, ctx.dream_id)
             assert dream is not None
@@ -159,7 +158,7 @@ def test_success_saves_scenes_and_schedules_images(monkeypatch, read_db, image_c
     assert {call["version_no"] for call in image_calls} == {1}
     assert all(call["characters"] == [{"name": "Grandmother", "appearance": "white hair"}] for call in image_calls)
     assert all(call["confidence_level"] == "high" for call in image_calls)
-    assert all(call["confidence_style"] == confidence_style_for("high") for call in image_calls)
+    assert all(call["confidence_style"] is None for call in image_calls)
     people = [
         element
         for element in rows.elements_of(read_db, rows.extractions(read_db)[-1].id)

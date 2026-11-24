@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import Confidence, ElementType, ExtractionPhase
-from app.models import DreamElement, Extraction
+from app.models import DreamElement, Extraction, WorldEntity
 from app.repositories import InvalidData
 
 
@@ -115,3 +115,27 @@ def set_character_appearances(db: Session, dream_id: int, characters: Sequence[M
         updated.append(element)
     db.flush()
     return updated
+
+
+def link_element_entity(db: Session, element_id: int, entity_id: int | None) -> DreamElement:
+    """요소를 세계관 인물·장소(world_entities)에 연결한다 (C 요청). entity_id=None이면 연결을 푼다.
+
+    요소가 없거나 세계관 항목이 없거나, 요소 종류와 세계관 종류가 다르면(person-person, place-place만 가능)
+    InvalidData를 던지고 아무것도 바꾸지 않는다. flush까지 하고 commit은 C가 한다.
+    """
+    element = db.get(DreamElement, element_id)
+    if element is None:
+        raise InvalidData("요소를 찾을 수 없습니다.", {"element_id": element_id})
+    if entity_id is not None:
+        entity = db.get(WorldEntity, entity_id)
+        if entity is None:
+            raise InvalidData("세계관 항목을 찾을 수 없습니다.", {"entity_id": entity_id})
+        if entity.kind != element.type:
+            raise InvalidData(
+                "요소 종류와 세계관 항목 종류가 다릅니다.",
+                {"element_type": element.type, "entity_kind": entity.kind},
+            )
+    element.entity_id = entity_id
+    db.flush()
+    return element
+
