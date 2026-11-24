@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.repositories import InvalidData, dreams, extractions, scenes
+from app.repositories import InvalidData, dreams, extractions, scenes, world
 from tests.repositories.helpers import ELEMENTS_PAYLOAD, SCENES
 
 GRANDMA = {"name": "할머니", "name_en": "the grandmother", "appearance_en": "short white hair, pink cardigan"}
@@ -79,3 +79,53 @@ def test_invalid_characters_change_nothing(db, dream_with_scenes, bad):
     with pytest.raises(InvalidData):
         extractions.set_character_appearances(db, dream.id, [GRANDMA, *bad])
     assert scenes.list_scene_characters(db, created[1].current_version_id) == []
+
+
+def _person_element(db, dream_id, name="할머니"):
+    return next(e for e in extractions.list_elements(db, dream_id) if e.name == name)
+
+
+def test_link_element_entity_sets_and_clears(db, dream_with_scenes):
+    dream, _ = dream_with_scenes
+    entity = world.create_entity(db, name="할머니", kind="person", hair="white bob")
+    element = _person_element(db, dream.id)
+
+    linked = extractions.link_element_entity(db, element.id, entity.id)
+    assert linked.entity_id == entity.id
+    assert extractions.link_element_entity(db, element.id, None).entity_id is None
+
+
+def test_link_element_entity_rejects_bad_input_without_change(db, dream_with_scenes):
+    dream, _ = dream_with_scenes
+    place = world.create_entity(db, name="학교", kind="place")
+    person = world.create_entity(db, name="할머니", kind="person")
+    element = _person_element(db, dream.id)
+    extractions.link_element_entity(db, element.id, person.id)
+
+    with pytest.raises(InvalidData):  # 없는 요소
+        extractions.link_element_entity(db, 999_999_999, person.id)
+    with pytest.raises(InvalidData):  # 없는 세계관 항목
+        extractions.link_element_entity(db, element.id, 999_999_999)
+    with pytest.raises(InvalidData):  # 인물 요소에 장소 연결
+        extractions.link_element_entity(db, element.id, place.id)
+    assert db.get(type(element), element.id).entity_id == person.id
+
+
+def test_scene_characters_include_world_entity_fields(db, dream_with_scenes):
+    dream, created = dream_with_scenes
+    extractions.set_character_appearances(db, dream.id, [GRANDMA])
+    entity = world.create_entity(
+        db, name="할머니", kind="person", age_range="elderly", hair="short white hair", outfit="pink cardigan"
+    )
+    extractions.link_element_entity(db, _person_element(db, dream.id).id, entity.id)
+
+    assert scenes.list_scene_characters(db, created[1].current_version_id) == [
+        {
+            "name": "the grandmother",
+            "appearance": "short white hair, pink cardigan",
+            "age_range": "elderly",
+            "hair": "short white hair",
+            "outfit": "pink cardigan",
+            "features": None,
+        }
+    ]
