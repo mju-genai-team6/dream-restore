@@ -1,13 +1,17 @@
 """요청 안에서 LLM을 부르는 처리(질문 생성, 재추출, STT)의 공통 부분: 꿈별 잠금, 오류 변환."""
+import logging
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import TypeVar
 
-from app.core.errors import LlmFailed, SttFailed, UpstreamTimeout
+from app.core.errors import AppError, LlmFailed, SttFailed, UpstreamTimeout
+from app.core.logs import exception_chain, short_message
 from app.llm.client import LlmCallError, LlmError, LlmSchemaError, LlmTimeoutError
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 TIMEOUT_MESSAGE = "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요."
 STT_FAILED_MESSAGE = "음성을 텍스트로 변환하지 못했습니다. 다시 녹음하거나 텍스트로 입력해 주세요."
@@ -31,11 +35,11 @@ def call_llm(func: Callable[..., T], *args, failed_message: str) -> T:
         return func(*args)
     except LlmTimeoutError as exc:
         # LlmCallError의 하위라 아래보다 먼저 잡아야 504가 된다
-        raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
+        raise _logged(func, exc, UpstreamTimeout(TIMEOUT_MESSAGE)) from exc
     except LlmCallError as exc:
-        raise LlmFailed(failed_message) from exc
+        raise _logged(func, exc, LlmFailed(failed_message)) from exc
     except LlmSchemaError as exc:
-        raise LlmFailed(failed_message) from exc
+        raise _logged(func, exc, LlmFailed(failed_message)) from exc
 
 
 def call_stt(func: Callable[..., T], *args) -> T:
@@ -48,6 +52,15 @@ def call_stt(func: Callable[..., T], *args) -> T:
     try:
         return func(*args)
     except LlmTimeoutError as exc:
-        raise UpstreamTimeout(TIMEOUT_MESSAGE) from exc
+        raise _logged(func, exc, UpstreamTimeout(TIMEOUT_MESSAGE)) from exc
     except LlmError as exc:
-        raise SttFailed(STT_FAILED_MESSAGE) from exc
+        raise _logged(func, exc, SttFailed(STT_FAILED_MESSAGE)) from exc
+
+
+def _logged(func: Callable, exc: BaseException, error: AppError) -> AppError:
+    """원인 예외는 로그에만 남기고, 응답은 사용자용 문구 그대로 둔다."""
+    logger.warning(
+        "LLM 호출 실패 func=%s status=%s error_code=%s cause=%s message=%s",
+        getattr(func, "__name__", func), error.status_code, error.code, exception_chain(exc), short_message(exc),
+    )
+    return error

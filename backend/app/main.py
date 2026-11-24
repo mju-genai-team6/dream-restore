@@ -11,10 +11,11 @@ from fastapi.staticfiles import StaticFiles
 from app.api import router as api_router
 from app.core.config import settings
 from app.core.errors import AudioTooLarge, error_body, register_error_handlers
+from app.core.logs import configure_logging
 from app.jobs import runner
 from app.jobs.handlers.images import install_image_handler
 
-# uvicorn이 핸들러를 붙여 둔 로거. app 로거의 INFO는 로깅 설정이 없어 출력되지 않는다
+configure_logging()
 logger = logging.getLogger("uvicorn.error")
 
 

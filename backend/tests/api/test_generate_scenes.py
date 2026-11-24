@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from app.core.enums import DreamStatus, ElementType, JobType
 from app.jobs import runner
@@ -15,6 +15,7 @@ from app.llm.schemas import Scene as LlmScene
 from app.llm.schemas import SceneCharacter, SceneSplitResult
 from app.main import app
 from app.models import Dream, Scene, SceneVersion
+from app.repositories import jobs as job_repo
 from tests.api import rows
 from tests.llm_fakes import FakeLlm
 
@@ -330,3 +331,36 @@ def test_image_job_row_failure_rolls_back_scenes(monkeypatch, read_db, image_cal
     assert [row.type for row in rows.jobs(read_db)] == [JobType.GENERATE_SCENES.value]
     assert image_calls == []
     assert client.get(f"/dreams/{dream_id}").json()["status"] == "interviewing"
+
+
+@pytest.mark.parametrize("status", ["queued", "running"])
+def test_interrupted_scenes_job_keeps_interviewing_and_can_retry(
+    monkeypatch, read_db, session_factory: sessionmaker[Session], image_calls, status
+):
+    """재시작으로 중단되면 꿈은 interviewing에 남고, 같은 API로 다시 요청할 수 있다."""
+    monkeypatch.setattr(
+        scene_jobs, "split_scenes", lambda text, answers, elements, complete=None: _split_result(elements)
+    )
+    dream_id, _ = _ready_dream()
+    schedule = runner.schedule
+    monkeypatch.setattr(runner, "schedule", lambda background_tasks, job_id, payload=None: None)
+    interrupted = _request(dream_id).json()["job_id"]
+    if status == "running":
+        with session_factory.begin() as db:
+            assert job_repo.claim_job(db, interrupted)
+
+    assert runner.recover_interrupted() == 1
+
+    job = _job(interrupted)
+    assert (job["status"], job["error"]["code"]) == ("failed", "INTERRUPTED")
+    dream = client.get(f"/dreams/{dream_id}").json()
+    assert (dream["status"], dream["active_job"]) == ("interviewing", None)
+    assert _stored_scenes(read_db) == []
+
+    monkeypatch.setattr(runner, "schedule", schedule)
+    again = _request(dream_id)
+    assert again.status_code == 202, again.text
+    assert again.json()["job_id"] != interrupted
+    assert _job(again.json()["job_id"])["status"] == "succeeded"
+    assert len(_stored_scenes(read_db)) == 3
+    assert len(image_calls) == 3
