@@ -9,11 +9,16 @@ payload (Job API가 넣어 줌):
     text: str            읽을 문장. D의 summary_ko 또는 짧게 다듬은 나레이션 문장
     voice: str           (선택) 기본값은 설정의 tts_voice
 
+저장 위치: media(storage)/dreams/{dreamId}/scenes/{sceneId}/v{versionNo}/narration.mp3  (paths.scene_narration)
+가짜 모드: .env에 TTS_FAKE=true면 API를 부르지 않고 글자 수에 맞춘 무음 mp3를 저장한다 (비용 없이 흐름 확인용).
+    API 키도 필요 없다. 건너뛰고 싶으면 작업을 만들지 않으면 된다 (E1은 narration.mp3가 없으면 나레이션 없이 렌더링).
+
 결과 (나레이션 기록):
     narration_path, duration_seconds, text, model, voice, speed, attempts, generated_at
 """
 from __future__ import annotations
 
+import math
 import shutil
 import time
 from collections.abc import Callable
@@ -42,6 +47,7 @@ class NarrationSettings(BaseSettings):
     tts_instructions: str = "Speak softly and calmly in Korean, like recalling a dream."
     tts_max_chars: int = 200  # 너무 길면 장면이 지나치게 길어지므로 제한
     tts_max_retries: int = 2
+    tts_fake: bool = False  # True면 무음 mp3를 만든다 (API 호출·비용 없음)
 
 
 tts_settings = NarrationSettings()
@@ -74,6 +80,18 @@ def _parse_payload(payload: dict) -> tuple[int, int, str, str]:
         )
     voice = str(payload.get("voice") or tts_settings.tts_voice)
     return scene_id, version_no, text, voice
+
+
+# 가짜 모드용 무음 프레임: MPEG-1 Layer III, 128kbps, 44.1kHz. 프레임 1개 = 1152샘플 ≈ 0.02612초
+_SILENT_FRAME = bytes([0xFF, 0xFB, 0x90, 0x64]) + bytes(417 - 4)
+_FAKE_SECONDS_PER_CHAR = 0.15  # 한국어 낭독 속도 추정
+_FRAME_SECONDS = 1152 / 44100
+
+
+def fake_speech(text: str) -> bytes:
+    """글자 수에 비례한 길이(최소 1초)의 무음 mp3 바이트."""
+    seconds = max(1.0, len(text) * _FAKE_SECONDS_PER_CHAR)
+    return _SILENT_FRAME * math.ceil(seconds / _FRAME_SECONDS)
 
 
 def _request_speech(client: openai.OpenAI, text: str, voice: str) -> bytes:
@@ -133,7 +151,11 @@ def handle_generate_narration(ctx: JobContext, payload: dict) -> dict:
 
     ctx.report_stage(JobStage.REQUESTING)
     ctx.logger.info("나레이션 생성 요청 scene=%s v%s voice=%s", scene_id, version_no, voice)
-    audio, attempts = _generate_with_retry(ctx, get_client(), text, voice)
+    if tts_settings.tts_fake:
+        ctx.logger.info("TTS_FAKE: 무음 mp3를 만듭니다 scene=%s v%s", scene_id, version_no)
+        audio, attempts = fake_speech(text), 0
+    else:
+        audio, attempts = _generate_with_retry(ctx, get_client(), text, voice)
 
     ctx.report_stage(JobStage.SAVING)
     tmp_file = ctx.tmp_dir() / f"scene_{scene_id}_v{version_no}_narration.mp3"
@@ -149,6 +171,7 @@ def handle_generate_narration(ctx: JobContext, payload: dict) -> dict:
         "text": text,
         "model": tts_settings.tts_model,
         "voice": voice,
+        "fake": tts_settings.tts_fake,
         "speed": tts_settings.tts_speed,
         "attempts": attempts,
         "generated_at": datetime.now(UTC).isoformat(),
