@@ -121,6 +121,7 @@ def test_scenes_in_order_with_elements_and_queued_image_job(monkeypatch, pending
                 "name": e["name"],
                 "type": e["type"],
                 "confidence": _confidence_for(e),
+                "entity_id": None,
             }
             for e in elements
         ]

@@ -76,6 +76,7 @@ def test_first_get_reextracts_and_refresh_returns_saved(llm, read_db):
         "name": "할머니",
         "description": "흰 머리에 분홍색 카디건을 입음",
         "confidence": None,
+        "entity_id": None,
     }
     assert {e["element_id"] for e in elements}.isdisjoint(_raw_element_ids(read_db, dream_id))
 

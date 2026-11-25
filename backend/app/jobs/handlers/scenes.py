@@ -16,6 +16,7 @@ from app.repositories import InvalidData
 from app.repositories import dreams as dream_repo
 from app.repositories import extractions as extraction_repo
 from app.repositories import scenes as scene_repo
+from app.services import world as world_service
 from app.services.state_machine import ensure_transition
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,9 @@ def save_scenes(db: Session, job: Job, result: dict) -> list[FollowUp]:
             exc.message,
             exc.detail.get("names"),
         )
+
+    # 이미지 payload의 인물 외형은 이 연결을 본 뒤 읽는다. 실패해도 장면 작업은 계속되고, commit은 하지 않는다.
+    world_service.link_dream_elements_to_world(db, job.dream_id)
 
     try:
         ensure_transition(DreamStatus.INTERVIEWING, DreamStatus.SCENES_READY)

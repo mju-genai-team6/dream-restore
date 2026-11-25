@@ -30,6 +30,7 @@ def _element_response(rows: list[DreamElement]) -> ElementListResponse:
                 name=row.name,
                 description=row.description,
                 confidence=row.confidence,
+                entity_id=row.entity_id,
             )
             for row in rows
         ]
