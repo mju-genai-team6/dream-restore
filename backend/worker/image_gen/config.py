@@ -14,6 +14,7 @@ class ImageSettings(BaseSettings):
     image_size: str = "1536x1024"  # 가로형. 16:9 영상에 넣을 때 여백이 가장 적음
     image_quality: str = "medium"
     image_max_retries: int = 2  # 시간 초과·일시적 오류일 때 자동 재시도 횟수
+    image_soften_on_policy: bool = True  # 콘텐츠 정책 거부 시 순화 문구를 붙여 한 번 더 시도
 
 
 image_settings = ImageSettings()
