@@ -57,11 +57,13 @@ def test_result_fits_create_scenes_input():
         assert {"order", "summary_ko", "element_names", "image_prompt_en"} <= scene.keys()
 
 
-def test_unknown_element_name_dropped_without_retry():
+def test_unknown_element_name_dropped_without_retry(caplog):
     """요소 목록에 없는 이름은 다시 요청하지 않고 버린다. 결과에는 목록에 있는 이름만 남는다."""
     bad = _changed(lambda d: d["scenes"][0]["element_names"].append("없는 요소"))
     llm = FakeLlm(bad)
-    result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    with caplog.at_level("WARNING", logger="app.llm.scenes"):
+        result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    assert "없는 요소" in caplog.text  # 무엇을 뺐는지 경고 로그로 남긴다
     assert len(llm.calls) == 1
     names = {e.name for e in ELEMENTS}
     assert all(n in names for s in result.scenes for n in s.element_names)
@@ -89,7 +91,7 @@ def test_missing_character_is_retried():
     assert len(llm.calls) == 2
 
 
-def test_non_person_characters_dropped_without_retry():
+def test_non_person_characters_dropped_without_retry(caplog):
     """동물·물건이 characters에 들어오거나 같은 인물이 두 번 오면 다시 요청하지 않고 걸러 낸다."""
 
     def add_extra(d):
@@ -97,7 +99,9 @@ def test_non_person_characters_dropped_without_retry():
         d["characters"].append(dict(d["characters"][0], appearance_en="duplicate"))
 
     llm = FakeLlm(_changed(add_extra))
-    result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    with caplog.at_level("WARNING", logger="app.llm.scenes"):
+        result = split_scenes(TEXT, ANSWERS, ELEMENTS, complete=llm)
+    assert "우산" in caplog.text
     assert len(llm.calls) == 1
     assert [c.name for c in result.characters] == ["할머니"]
     assert result.characters[0].appearance_en != "duplicate"

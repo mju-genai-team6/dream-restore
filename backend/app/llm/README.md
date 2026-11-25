@@ -38,6 +38,7 @@ create_scenes(db, dream_id, result.model_dump()["scenes"])
 - **즉시 응답 오류는 `LLM_FAILED`, 작업 실패 사유는 `LLM_SCHEMA`입니다.** 질문 생성·재추출처럼 요청 안에서 부르면 서버가 `LLM_FAILED`(502)로 응답하고, `generate_scenes` 작업 안에서 형식 오류가 나면 작업 실패 사유가 `LLM_SCHEMA`가 됩니다.
 - 응답이 없을 때: OpenAI SDK 자체 재시도는 1회(`OPENAI_MAX_RETRIES`)라 오류까지 최대 `LLM_TIMEOUT_SECONDS` × 2가 걸립니다 (기본 30초라 약 60초).
 - 스키마 외 검사(재요청 대상): 요소 name 중복, 질문 대상이 요소 목록에 없음, 장면 `element_names`가 비어 있음, 장면에 인물·장소·물건이 없음, 인물별 `characters` 누락.
-- 재요청 없이 코드에서 걸러 내는 것: 장면 `element_names` 중 요소 목록에 없는 이름, `characters` 중 person이 아닌 항목(동물·물건)과 중복. 그래서 돌려받은 결과의 `element_names`와 `characters`에는 요소 목록에 있는 이름만 들어 있습니다.
+- STT 무음·환각: 말소리가 없는 녹음에서 Whisper가 지어낸 문장("고맙습니다.", "시청해주셔서 감사합니다.", "MBC 뉴스 ...입니다")은 구간별 `no_speech_prob`(0.6 이상)와 알려진 문장 목록으로 버립니다. 남는 말이 없으면 `SttEmptyResultError`입니다. 버린 구간은 경고 로그에 남습니다.
+- 재요청 없이 코드에서 걸러 내는 것: 장면 `element_names` 중 요소 목록에 없는 이름, `characters` 중 person이 아닌 항목(동물·물건)과 중복. 그래서 돌려받은 결과의 `element_names`와 `characters`에는 요소 목록에 있는 이름만 들어 있습니다. 뺀 이름은 경고 로그(`app.llm.scenes`)에 남습니다.
 
 실제 API로 돌려 보기: `cd backend && python scripts/try_interview.py` (`.env`에 `OPENAI_API_KEY` 필요)
