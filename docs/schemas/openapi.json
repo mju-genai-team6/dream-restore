@@ -2183,6 +2183,18 @@
               }
             ],
             "description": "입력 전이면 null"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id",
+            "description": "연결된 세계관 항목. 없으면 null"
           }
         },
         "type": "object",
@@ -2889,6 +2901,17 @@
                 "type": "null"
               }
             ]
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
           }
         },
         "type": "object",

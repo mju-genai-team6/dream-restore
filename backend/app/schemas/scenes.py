@@ -14,6 +14,7 @@ class SceneElement(BaseModel):
     name: str
     type: ElementType
     confidence: Confidence | None = None
+    entity_id: int | None = None
 
 
 class SceneItem(BaseModel):

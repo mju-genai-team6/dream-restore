@@ -38,6 +38,7 @@ def _elements(version: SceneVersion, elements: dict[int, DreamElement]) -> list[
                 name=element.name,
                 type=ElementType(element.type),
                 confidence=Confidence(element.confidence) if element.confidence else None,
+                entity_id=element.entity_id,
             )
         )
     return items

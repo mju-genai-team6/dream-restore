@@ -158,6 +158,7 @@ ELEMENTS = {
             "name": "학교 복도",
             "description": "어둡고 긴 복도, 형광등이 깜빡임",
             "confidence": "high",
+            "entity_id": None,
         },
         {
             "element_id": 2,
@@ -165,6 +166,7 @@ ELEMENTS = {
             "name": "할머니",
             "description": "흰 머리에 분홍색 카디건을 입음",
             "confidence": "medium",
+            "entity_id": None,
         },
         {
             "element_id": 3,
@@ -172,6 +174,7 @@ ELEMENTS = {
             "name": "우산",
             "description": "노란색 장우산",
             "confidence": "high",
+            "entity_id": None,
         },
         {
             "element_id": 4,
@@ -179,6 +182,7 @@ ELEMENTS = {
             "name": "바다",
             "description": "창밖으로 보인 회색 바다, 파도가 높음",
             "confidence": "low",
+            "entity_id": None,
         },
         {
             "element_id": 5,
@@ -186,6 +190,7 @@ ELEMENTS = {
             "name": "두려움",
             "description": "바다를 보고 무서웠음",
             "confidence": "medium",
+            "entity_id": None,
         },
         {
             "element_id": 6,
@@ -193,6 +198,7 @@ ELEMENTS = {
             "name": "안도감",
             "description": "우산을 받고 마음이 놓임",
             "confidence": "low",
+            "entity_id": None,
         },
     ]
 }
@@ -235,8 +241,8 @@ SCENES = {
             "image_url": f"{_image_url(1)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
-                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high", "entity_id": None},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium", "entity_id": None},
             ],
             "status": "succeeded",
             "confidence_level": "high",
@@ -249,10 +255,10 @@ SCENES = {
             "image_url": f"{_image_url(2)}?v={IMAGE_VERSION}",
             "version_no": 1,
             "elements": [
-                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high"},
-                {"element_id": 2, "name": "할머니", "type": "person", "confidence": "medium"},
-                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
-                {"element_id": 6, "name": "안도감", "type": "emotion", "confidence": "low"},
+                {"element_id": 1, "name": "학교 복도", "type": "place", "confidence": "high", "entity_id": None},
+                {"element_id": 2, "name": "할머니", "type": "person", "confidence": "medium", "entity_id": None},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high", "entity_id": None},
+                {"element_id": 6, "name": "안도감", "type": "emotion", "confidence": "low", "entity_id": None},
             ],
             "status": "succeeded",
             "confidence_level": "high",
@@ -265,9 +271,9 @@ SCENES = {
             "image_url": None,
             "version_no": 1,
             "elements": [
-                {"element_id": 4, "name": "바다", "type": "place", "confidence": "low"},
-                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high"},
-                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium"},
+                {"element_id": 4, "name": "바다", "type": "place", "confidence": "low", "entity_id": None},
+                {"element_id": 3, "name": "우산", "type": "object", "confidence": "high", "entity_id": None},
+                {"element_id": 5, "name": "두려움", "type": "emotion", "confidence": "medium", "entity_id": None},
             ],
             "status": "running",
             "confidence_level": None,

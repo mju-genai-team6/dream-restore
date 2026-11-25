@@ -11,6 +11,7 @@ class ElementItem(BaseModel):
     name: str
     description: str = ""
     confidence: Confidence | None = Field(default=None, description="입력 전이면 null")
+    entity_id: int | None = Field(default=None, description="연결된 세계관 항목. 없으면 null")
 
 
 class ElementListResponse(BaseModel):
