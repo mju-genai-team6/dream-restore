@@ -1,4 +1,6 @@
 """장면 모듈: 인터뷰가 끝난 꿈을 3~5개 장면으로 나누고 장면별 이미지 프롬프트를 만듭니다."""
+import logging
+
 from app.core.enums import ElementType
 from app.llm.client import Complete, call_json, load_prompt
 from app.llm.interview import NO_MEMORY
@@ -8,6 +10,8 @@ from app.llm.schemas import (
     SceneCharacter,
     SceneSplitResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def split_scenes(
@@ -44,6 +48,10 @@ def split_scenes(
         """스키마로는 볼 수 없는 내용 검사. 문제가 있으면 call_json이 다시 요청합니다."""
         for scene in result.scenes:
             # 요소 목록에 없는 이름(예: 목록에 없는 "나무")은 어느 요소와도 연결할 수 없으므로 버린다 (중복도 제거)
+            dropped = [n for n in scene.element_names if n not in names]
+            if dropped:
+                # 프롬프트를 고칠 때 참고하려고 남긴다 (C 요청 #34)
+                logger.warning("장면 %s의 element_names에서 요소 목록에 없는 이름을 뺌: %s", scene.order, dropped)
             scene.element_names = [n for n in dict.fromkeys(scene.element_names) if n in names]
             if not scene.element_names:
                 raise ValueError(
@@ -58,9 +66,14 @@ def split_scenes(
                 )
         # 동물·물건을 인물로 착각해 넣는 경우가 잦다. 남는 항목은 다시 요청하지 않고 버린다 (같은 인물이 둘이면 첫 번째만)
         kept: dict[str, SceneCharacter] = {}
+        dropped_characters: list[str] = []
         for c in result.characters:
             if c.name in person_names and c.name not in kept:
                 kept[c.name] = c
+            else:
+                dropped_characters.append(c.name)
+        if dropped_characters:
+            logger.warning("characters에서 person이 아니거나 겹치는 항목을 뺌: %s", dropped_characters)
         result.characters = list(kept.values())
         got = [c.name for c in result.characters]
         if set(got) != person_names:
