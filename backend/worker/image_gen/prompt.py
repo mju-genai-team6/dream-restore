@@ -65,3 +65,18 @@ def build_prompt(
     if _clean(confidence_style):
         parts.append(f"Memory clarity: {_clean(confidence_style)}.")
     return " ".join(parts)
+
+
+# 콘텐츠 정책 거부 시 한 번 더 시도할 때 앞에 붙이는 순화 문구 (E2 결정, D에 통보).
+# 장면 내용은 바꾸지 않고 표현 방식만 완화한다. 악몽의 분위기는 남기되 직접적인 묘사를 피한다
+SOFTEN_PREFIX = (
+    "Depict this dream scene in a gentle, non-graphic, symbolic way suitable for all ages. "
+    "Keep the mood, but show no blood, gore, injury, weapons in use or explicit violence."
+)
+
+
+def soften_prompt(prompt: str) -> str:
+    """정책 거부된 프롬프트를 순화 문구로 감싼다. 이미 순화된 프롬프트는 그대로 둔다."""
+    if prompt.startswith(SOFTEN_PREFIX):
+        return prompt
+    return f"{SOFTEN_PREFIX} {prompt}"
