@@ -38,7 +38,12 @@ from app.jobs.context import JobContext, JobError
 from app.jobs.registry import register
 from app.storage import paths
 from worker.image_gen.config import image_settings as img_cfg
-from worker.image_gen.prompt import WORLD_ENTITY_FIELDS, Character, build_prompt
+from worker.image_gen.prompt import (
+    WORLD_ENTITY_FIELDS,
+    Character,
+    build_prompt,
+    soften_prompt,
+)
 
 # OpenAI가 콘텐츠 정책 위반으로 거절할 때 주는 오류 코드
 _CONTENT_POLICY_CODES = {"content_policy_violation", "moderation_blocked"}
@@ -162,7 +167,19 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
     ctx.report_stage(JobStage.REQUESTING)
     ctx.logger.info("이미지 생성 요청 scene=%s v%s model=%s", scene_id, version_no, img_cfg.openai_image_model)
     started = time.monotonic()
-    image_bytes, attempts = _generate_with_retry(ctx, get_client(), final_prompt)
+    client = get_client()
+    softened = False
+    try:
+        image_bytes, attempts = _generate_with_retry(ctx, client, final_prompt)
+    except JobError as e:
+        # 정책 거부 시 표현 완화 규칙 (E2 결정): 순화 문구를 붙여 한 번만 더 시도하고, 또 거부되면 실패
+        if e.code != FailureCode.CONTENT_POLICY or not img_cfg.image_soften_on_policy:
+            raise
+        ctx.logger.warning("콘텐츠 정책 거부, 순화한 프롬프트로 한 번 더 시도 (scene=%s)", scene_id)
+        final_prompt = soften_prompt(final_prompt)
+        softened = True
+        image_bytes, more = _generate_with_retry(ctx, client, final_prompt)
+        attempts = 1 + more
     elapsed = round(time.monotonic() - started, 2)
 
     ctx.report_stage(JobStage.SAVING)
@@ -176,7 +193,8 @@ def handle_generate_image(ctx: JobContext, payload: dict) -> dict:
         "image_path": str(paths.scene_original(ctx.dream_id, scene_id, version_no)),
         "final_prompt": final_prompt,
         "model": img_cfg.openai_image_model,
-        "settings": image_settings(),
+        # 정책 거부 후 순화 문구로 다시 만든 이미지만 policy_softened: True를 남긴다 (final_prompt에도 순화 문구가 남음)
+        "settings": {**image_settings(), **({"policy_softened": True} if softened else {})},
         "seed": None,  # OpenAI 이미지 API는 seed를 지원하지 않음
         "attempts": attempts,
         "elapsed_seconds": elapsed,

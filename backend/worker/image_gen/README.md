@@ -54,14 +54,34 @@
 
 ### 반환값 (장면 버전에 기록)
 
-`image_path`, `final_prompt`, `model`, `settings`(size, quality), `seed`(OpenAI는 지원 안 함 → `null`),
-`attempts`, `elapsed_seconds`, `generated_at`
+`image_path`, `final_prompt`, `model`, `settings`(size, quality, 순화했으면 `policy_softened: true`),
+`seed`(OpenAI는 지원 안 함 → `null`), `attempts`, `elapsed_seconds`, `generated_at`
+
+### 정책 거부 시 표현 완화 규칙 (E2 결정, D에 통보)
+
+악몽처럼 무섭거나 폭력적인 장면은 콘텐츠 정책으로 거부될 수 있습니다 (계획서 3.2).
+
+1. 거부되면 프롬프트 앞에 순화 문구(`prompt.py`의 `SOFTEN_PREFIX`)를 붙여 **한 번만** 다시 시도합니다.
+   장면 내용은 그대로 두고 "부드럽고 상징적으로, 피·부상·무기 사용·노골적 폭력은 그리지 않음"으로 표현 방식만 완화합니다.
+2. 또 거부되면 그 장면만 `CONTENT_POLICY`로 실패합니다. 다른 장면은 계속 진행됩니다.
+3. 순화해서 만든 이미지는 `final_prompt`에 순화 문구가 남고 `settings.policy_softened = true`로 기록됩니다.
+4. 끄려면 `.env`에 `IMAGE_SOFTEN_ON_POLICY=false` (거부되면 바로 실패).
+
+D의 장면 프롬프트는 바꾸지 않습니다. D가 처음부터 표현을 완화해 주면 거부 자체가 줄어듭니다.
+
+### 계획서와 다르게 진행한 것
+
+- **이미지 API 후보 2~3개 비교 (계획서 3.1)**: 하지 않았습니다. 팀에 OpenAI 키만 있어 다른 회사 API는 키와 예산이
+  별도로 필요해 개발 범위 밖으로 두었습니다. `gpt-image-2` 하나로 진행했고, 생성 시간은 실측 20장으로 기록했습니다 (#40).
+- **시드 고정 (계획서 2장, 3.3 조건 C)**: OpenAI 이미지 API가 seed를 지원하지 않습니다. 인물 일관성 실험의 C 조건은
+  화풍·구도 고정만 적용했고, 장면 버전의 `seed`는 `null`로 기록합니다. 재현은 기록한 `final_prompt`와 설정으로 다시 생성하는 수준입니다.
+- **정책 거부 완화 (계획서 3.2)**: D와 합의 대신 E2가 위 규칙으로 정하고 D에 통보했습니다.
 
 ### 정해 둔 값 (팀 협의 전 임시)
 
 - 크기 `1536x1024` 가로형: E1 렌더링(1280×720)이 남는 부분을 여백으로 채우므로 16:9에 가장 가까운 크기 사용
 - 재시도: 시간 초과·일시적 오류(429, 5xx, 연결 오류, 손상된 이미지)는 작업 함수 안에서 최대 2회 재시도(1초, 2초 대기).
-  콘텐츠 정책 거부·잘못된 요청은 바로 실패. **작업 실행기(C)에서는 추가 재시도하지 않아도 됩니다.**
-- 설정은 `.env`의 `OPENAI_IMAGE_MODEL`, `IMAGE_SIZE`, `IMAGE_QUALITY`, `IMAGE_MAX_RETRIES`로 바꿀 수 있습니다.
+  콘텐츠 정책 거부는 위 순화 규칙으로 한 번만 더 시도하고, 잘못된 요청은 바로 실패. **작업 실행기(C)에서는 추가 재시도하지 않아도 됩니다.**
+- 설정은 `.env`의 `OPENAI_IMAGE_MODEL`, `IMAGE_SIZE`, `IMAGE_QUALITY`, `IMAGE_MAX_RETRIES`, `IMAGE_SOFTEN_ON_POLICY`로 바꿀 수 있습니다.
 
-테스트: `tests/test_image_gen.py`는 `backend/tests/` 담당자와 협의 후 추가 예정 (실제 API를 부르지 않음)
+테스트: `tests/test_image_confidence_style.py`, `tests/test_image_policy_soften.py` (실제 API를 부르지 않음)
