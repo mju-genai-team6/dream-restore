@@ -1,7 +1,7 @@
 """generate_image 작업 연결 (C-S3-02). 실제 핸들러는 E2(worker/image_gen/generate.py), 저장은 후처리에서 한다.
 
 - payload는 E2 입력 형식(image_payload). confidence_level은 항상 넣고, 스타일 문구는 설정이 켜져 있을 때만 넣는다
-- 성공 후처리: 꿈 행을 잠근 뒤 결과와 장면 확신도를 한 번에 저장하고, 모든 장면이 끝났으면 images_ready
+- 성공 후처리: 꿈 행을 잠근 뒤 결과와 장면 확신도를 한 번에 저장하고, 조건이 맞으면 images_ready
 - 실패 후처리: 장면 버전 failed. 꿈은 scenes_ready 그대로 두고 POST /dreams/{id}/images/retry로 다시 만든다
 - settings.image_generation_mode가 fake면 서버 시작 때 가짜 핸들러를 등록한다(install_image_handler)
 """
@@ -23,6 +23,7 @@ from app.models.job import Job
 from app.models.scene import SceneVersion
 from app.repositories import dreams as dream_repo
 from app.repositories import extractions as extraction_repo
+from app.repositories import jobs as job_repo
 from app.repositories import scenes as scene_repo
 from app.services.state_machine import ensure_transition
 from app.storage import paths
@@ -106,11 +107,28 @@ def save_image(db: Session, job: Job, result: dict) -> None:
     if not saved:
         raise JobError(FailureCode.INVALID_INPUT, ALREADY_SAVED_MESSAGE)
 
-    if not scene_repo.all_images_done(db, job.dream_id):
+    maybe_mark_images_ready(db, job.dream_id, ignore_job_id=job.id)
+
+
+def maybe_mark_images_ready(db: Session, dream_id: int, *, ignore_job_id: int | None = None) -> None:
+    """이미지가 모두 성공하고 진행 중인 나레이션이 없을 때만 scenes_ready를 images_ready로 바꾼다.
+
+    꿈 행을 잠근 뒤 조건을 읽는다. 동시에 끝나도 뒤 작업은 앞 작업의 commit을 본 다음에 조건을 보므로
+    전이는 한 번이다. on_success 안의 현재 작업은 아직 running이라 ignore_job_id로 진행 중에서 뺀다.
+    나레이션 작업이 없으면(기능이 꺼진 경우) 이미지 조건만 남는다.
+    이미 scenes_ready가 아니면 로그만 남기고 작업을 실패로 만들지 않는다.
+    """
+    dream_repo.lock_dream(db, dream_id)
+    if not scene_repo.all_images_done(db, dream_id):
+        return
+    if any(
+        row.type == JobType.GENERATE_NARRATION and row.id != ignore_job_id
+        for row in job_repo.get_active_jobs(db, dream_id)
+    ):
         return
     ensure_transition(DreamStatus.SCENES_READY, DreamStatus.IMAGES_READY)
-    if not dream_repo.transition_status(db, job.dream_id, DreamStatus.SCENES_READY, DreamStatus.IMAGES_READY):
-        logger.info("꿈 %s는 이미 scenes_ready가 아니어서 상태를 바꾸지 않습니다.", job.dream_id)
+    if not dream_repo.transition_status(db, dream_id, DreamStatus.SCENES_READY, DreamStatus.IMAGES_READY):
+        logger.info("꿈 %s는 이미 scenes_ready가 아니어서 상태를 바꾸지 않습니다.", dream_id)
 
 
 @on_failure(JobType.GENERATE_IMAGE)
