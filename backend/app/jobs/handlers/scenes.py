@@ -3,10 +3,12 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.enums import DreamStatus, FailureCode, JobStage, JobType
 from app.core.errors import InvalidState
 from app.jobs.context import JobContext, JobError
 from app.jobs.handlers.images import image_payload
+from app.jobs.handlers.narration import narration_payload
 from app.jobs.registry import FollowUp, on_success, register
 from app.llm.client import LlmCallError, LlmSchemaError, LlmTimeoutError
 from app.llm.scenes import split_scenes
@@ -115,6 +117,19 @@ def save_scenes(db: Session, job: Job, result: dict) -> list[FollowUp]:
                 job_type=JobType.GENERATE_IMAGE,
                 target_id=version.id,
                 payload=image_payload(db, job.dream_id, version, item["image_prompt_en"], characters),
+            )
+        )
+        if not settings.narration_enabled:
+            continue
+        payload = narration_payload(version)
+        if payload is None:
+            logger.warning("장면 %s의 나레이션 문장이 없어 나레이션 작업을 등록하지 않습니다.", scene.id)
+            continue
+        followups.append(
+            FollowUp(
+                job_type=JobType.GENERATE_NARRATION,
+                target_id=version.id,
+                payload=payload,
             )
         )
     return followups

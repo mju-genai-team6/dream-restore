@@ -4,6 +4,7 @@
 - 같은 꿈에 같은 종류의 작업이 진행 중이면 기존 jobId 반환 (jobs/submit.py, create_job_or_get_active)
 - JobError(retryable=True)는 작업 종류별 재시도 횟수(_max_retries)까지 자동 재시도. CONTENT_POLICY는 바로 실패
 - generate_image는 E2 핸들러가 안에서 재시도하므로 실행기 재시도는 0회 (MAX_RETRIES_BY_TYPE)
+- generate_narration의 실행기 재시도는 1회 (MAX_RETRIES_BY_TYPE)
 - JobError가 아닌 예외는 재시도 없이 실패. error_code는 NULL(API에서 INTERNAL_ERROR)
 - 성공 후처리(on_success)와 succeeded는 같은 세션에서 한 번에 commit한다. 후처리가 실패하면 핸들러는 다시 실행하지 않는다
 - 후처리가 돌려준 다음 작업의 행(queued)도 같은 트랜잭션에서 만든다. commit 뒤에는 enqueue로 실행만 한다.
@@ -33,6 +34,7 @@ from sqlalchemy.orm import Session
 
 # 작업 함수 등록(@register). worker가 registry를 import하므로 registry가 아니라 여기서 불러온다
 import app.jobs.handlers.images
+import app.jobs.handlers.narration
 import app.jobs.handlers.scenes  # noqa: F401
 import worker.image_gen.generate
 import worker.render.handler
@@ -68,8 +70,12 @@ _UNEXPECTED_FAILURE = "작업 실패 %s status=failed error_code=%s step=%s atte
 session_factory = SessionLocal
 
 # 작업 종류별 실행기 재시도 횟수. 없으면 settings.job_max_retries.
-# generate_image는 E2가 안에서 최대 2회 재시도하므로, 실행기도 재시도하면 장면당 API 호출이 9번까지 늘어난다
-MAX_RETRIES_BY_TYPE: dict[JobType, int] = {JobType.GENERATE_IMAGE: 0}
+# generate_image는 E2가 안에서 최대 2회 재시도하므로, 실행기도 재시도하면 장면당 API 호출이 9번까지 늘어난다.
+# generate_narration은 실행기 재시도 1회다. E2 핸들러 안의 TTS 재시도와는 별개다.
+MAX_RETRIES_BY_TYPE: dict[JobType, int] = {
+    JobType.GENERATE_IMAGE: 0,
+    JobType.GENERATE_NARRATION: 1,
+}
 
 # 외부 이미지 API 동시 요청 수 제한. 테스트에서 바꿔 끼운다
 image_slots = threading.BoundedSemaphore(settings.image_max_concurrency)

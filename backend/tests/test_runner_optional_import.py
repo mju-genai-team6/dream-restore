@@ -15,6 +15,7 @@ _RELOADED = (
     "app.jobs.runner",
     "app.jobs.handlers.scenes",
     "app.jobs.handlers.images",
+    "app.jobs.handlers.narration",
     "worker.image_gen.generate",
     "worker.render.handler",
     "worker.render.narration",
@@ -62,6 +63,7 @@ def test_narration_import_failure_keeps_required_handlers(monkeypatch, caplog):
         jobs_pkg.runner = original_runner
         handlers_pkg.scenes = saved_modules["app.jobs.handlers.scenes"]
         handlers_pkg.images = saved_modules["app.jobs.handlers.images"]
+        handlers_pkg.narration = saved_modules["app.jobs.handlers.narration"]
         image_gen_pkg.generate = saved_modules["worker.image_gen.generate"]
         render_pkg.handler = saved_modules["worker.render.handler"]
         registry.HANDLERS.clear()
