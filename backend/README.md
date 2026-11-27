@@ -25,6 +25,7 @@ tests/              pytest
 ## API
 
 - 인터뷰 조회(GET)는 질문이 없으면 이때 요소 추출과 질문 생성을 한다(LLM 호출, 약 5~8초). 꿈별 잠금으로 동시에 여러 번 불러도 LLM은 한 번만 호출된다(서버 프로세스 1개 기준. 여러 프로세스로 띄우면 LLM이 두 번 불릴 수 있지만 질문은 한 번만 저장된다).
+- 장면 수정(`POST /scenes/{scene_id}/revisions`)은 `SCENE_REVISION_ENABLED`로 켜고, D의 `revise_scene`이 있어야 동작한다. 기본은 꺼져 있다.
 
 ## 이미지 생성 모드
 

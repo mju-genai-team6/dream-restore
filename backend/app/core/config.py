@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     audio_max_mb: int = 25
     confidence_prompt_style: bool = False
     narration_enabled: bool = False
+    scene_revision_enabled: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:
