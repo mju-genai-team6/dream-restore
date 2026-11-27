@@ -156,7 +156,7 @@ erDiagram
 | --- | --- | --- |
 | dream_id | FK dreams | |
 | type | text | `generate_scenes`, `generate_image`, `render_video`, `generate_narration`, `revise_scene` |
-| target_id | bigint, NULL | generate_image: scene_versions.id / render_video: renders.id / generate_narration·revise_scene: scenes.id / generate_scenes: NULL |
+| target_id | bigint, NULL | generate_image·generate_narration: scene_versions.id / render_video: renders.id / revise_scene: scenes.id / generate_scenes: NULL |
 | status | text | `queued`(기본), `running`, `succeeded`, `failed` |
 | stage | text, NULL | `docs/rules/job-status.md`의 처리 단계 |
 | error_code | text, NULL | 실패 사유 코드 |
@@ -173,6 +173,11 @@ erDiagram
 | scene_version_id | FK scene_versions | |
 | audio_path | text | `.../v{versionNo}/narration.mp3` |
 | duration | float, NULL | 초 |
+
+- 기록: `repositories.narrations.add_narration(db, scene_version_id, audio_path=, duration=)`. E2 결과의 `narration_path`, `duration_seconds`를 그대로 넘깁니다.
+  장면 버전마다 한 행이며, 이미 있으면 새로 만들지 않고 기존 행을 돌려줍니다. 장면 버전이 없거나 길이가 음수면 `InvalidData`.
+- 조회: `repositories.narrations.get_narration(db, scene_version_id)` (없으면 None).
+- E2 결과의 `text`, `model`, `voice`, `speed`는 컬럼이 없어 저장하지 않습니다 (계획서 범위 밖. 필요하면 C2에 요청).
 
 ### world_entities — (선택) 세계관 인물·장소
 

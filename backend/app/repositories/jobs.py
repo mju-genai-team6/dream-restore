@@ -30,8 +30,8 @@ def create_job_or_get_active(
 ) -> Job:
     """같은 꿈·종류·대상의 작업이 진행 중(queued·running)이면 그 작업을, 없으면 새 작업(queued)을 돌려준다.
 
-    target_id: generate_image는 scene_versions.id, render_video는 renders.id,
-    generate_narration·revise_scene은 scenes.id, generate_scenes는 None.
+    target_id: generate_image·generate_narration은 scene_versions.id, render_video는 renders.id,
+    revise_scene은 scenes.id, generate_scenes는 None.
     중복 방지는 jobs의 부분 유니크 인덱스가 하므로 동시에 여러 번 불러도 진행 중 작업은 하나다.
     """
     type_ = str(type_)
