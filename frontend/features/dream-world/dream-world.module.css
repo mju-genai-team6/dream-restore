@@ -1,0 +1,221 @@
+/* 꿈 세계관 화면.
+   화면 틀(.app ~ .main), 색, 화면 너비 기준(1150, 930, 650px)은
+   B2 결과 화면(features/dream-results/dream-results.module.css)과 같은 값으로 맞췄습니다. */
+.app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  background: radial-gradient(ellipse at 60% 0%, #f1effd 0, #f7f8fd 58%);
+  color: #30364d;
+  font-family: Arial, "Malgun Gothic", sans-serif;
+  font-size: 14px;
+}
+.app button { cursor: pointer; }
+.app button:disabled { cursor: not-allowed; opacity: .48; }
+.app button:focus-visible, .app input:focus-visible, .app textarea:focus-visible, .app a:focus-visible { outline: 3px solid #aaa0eb; outline-offset: 3px; }
+
+.sidebar { position: sticky; top: 0; height: 100vh; height: 100dvh; padding: 35px 17px 24px; background: #f9faffb8; border-right: 1px solid #e9eaf5; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 9px; }
+.brandMark { font-size: 33px; color: #8881d0; line-height: 1; text-shadow: 2px 3px 0 #e2defa; }
+.brand strong { display: block; font-size: 18px; letter-spacing: -.5px; }
+.brand div > span { display: block; color: #7b8199; font-size: 10px; margin-top: 6px; }
+.navigation { display: grid; gap: 10px; margin-top: 53px; }
+.navItem { display: flex; align-items: center; gap: 13px; width: 100%; padding: 14px 13px; color: #778099; border-radius: 11px; font-size: 13px; text-decoration: none; }
+.navItem:hover { background: #f0effa; color: #5d589b; }
+.navItem.activeNav { background: #eae7fc; color: #655bc0; font-weight: 700; }
+.sidebarDecoration { margin-top: auto; min-height: 180px; display: flex; align-items: center; justify-content: center; color: #c6c2eb; gap: 8px; background: radial-gradient(ellipse, #eae8fc66, transparent 70%); }
+.sidebarDecoration span:first-child { align-self: flex-start; margin-top: 50px; }
+.sidebarDecoration span:last-child { align-self: flex-end; margin-bottom: 36px; font-size: 23px; }
+.demoInfo { padding: 18px 10px 0; border-top: 1px solid #e8e8f2; }
+.demoBadge { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: #676095; }
+.demoBadge::before { content: ""; width: 6px; height: 6px; background: #9c90d7; border-radius: 50%; }
+.demoInfo p { color: #7d8197; font-size: 10px; line-height: 1.9; margin-top: 8px; }
+
+.main { width: 100%; max-width: 1510px; min-width: 0; margin: 0 auto; padding: 35px 30px 30px; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 29px; }
+.headingGroup { display: flex; gap: 14px; align-items: center; }
+.headingIcon { display: grid; place-items: center; width: 47px; height: 47px; flex: 0 0 auto; color: #8580cc; background: #eeebfc; border-radius: 15px; }
+.headingGroup h1 { font-size: 25px; line-height: 1.4; font-weight: 700; letter-spacing: -.8px; }
+.headingGroup p { color: #737b92; font-size: 12px; line-height: 1.8; margin-top: 5px; }
+.headerSide { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.summaryPill { background: #ffffffcf; padding: 8px 12px; border: 1px solid #eeedf6; border-radius: 9px; color: #737b96; font-size: 11px; }
+
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; gap: 23px; }
+.centerColumn { min-width: 0; display: grid; gap: 20px; }
+.card { background: #ffffffdb; border: 1px solid #e9e9f4; box-shadow: 0 4px 18px #62628b04; border-radius: 15px; padding: 21px 22px; min-width: 0; }
+.cardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.cardHead h2 { font-size: 15px; font-weight: 700; color: #444b69; }
+.cardHead p { color: #777e94; font-size: 11px; line-height: 1.8; margin-top: 5px; }
+.cardRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.textButton { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #8a86a6; font-size: 10px; padding: 3px 0; white-space: nowrap; }
+.textButton:hover { color: #655bc0; }
+
+.tabs { display: inline-flex; gap: 3px; padding: 3px; background: #f3f2fa; border-radius: 9px; flex: 0 0 auto; }
+.tabs button { border: 0; background: transparent; color: #7d8199; font-size: 11px; padding: 6px 11px; border-radius: 7px; }
+.tabs button.tabOn { background: #fff; color: #655bc0; font-weight: 700; box-shadow: 0 1px 4px #6a62b014; }
+
+/* 지도 */
+.mapFrame { position: relative; border-radius: 13px; overflow: hidden; background: linear-gradient(170deg, #e7e9fb 0%, #eef0fc 45%, #f4effa 100%); }
+.mapScroll { overflow: auto; max-height: 620px; }
+.mapCanvas { position: relative; min-width: 100%; aspect-ratio: 1.6; min-height: 380px; }
+.cloud { position: absolute; border-radius: 50%; filter: blur(14px); opacity: .75; pointer-events: none; background: radial-gradient(ellipse, #ffffff 0, #ffffff00 70%); }
+.cloudA { width: 46%; height: 34%; left: -6%; top: 58%; }
+.cloudB { width: 40%; height: 30%; right: -4%; top: 6%; }
+.cloudC { width: 36%; height: 26%; left: 30%; top: 70%; opacity: .55; }
+.mapLines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.mapLines path { fill: none; stroke-linecap: round; transition: opacity .2s, stroke .2s; }
+.line { stroke: #b9b0ec; opacity: .7; }
+.lineDim { stroke: #c9c4ea; opacity: .28; }
+.lineActive { stroke: #8d7fe0; opacity: .95; }
+.node { position: absolute; transform: translate(-50%, -50%); border: 0; padding: 0; background: none; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+.node:hover { z-index: 3; }
+.nodeImage { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; display: grid; place-items: center; border: 3px solid #fff; box-shadow: 0 0 0 5px #ffffff70, 0 8px 22px #6d63b42b; transition: transform .2s, box-shadow .2s; }
+.nodeImage img, .entityImage img, .frequentImage img, .dreamThumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.node:hover .nodeImage { transform: scale(1.05); }
+.nodeSelected { z-index: 2; }
+.nodeSelected .nodeImage { box-shadow: 0 0 0 5px #b3a8f2, 0 0 28px 8px #c8bff7, 0 8px 22px #6d63b433; }
+.nodeQuiet .nodeImage { opacity: .62; }
+.nodeLabel { position: absolute; top: calc(100% - 12px); display: flex; flex-direction: column; align-items: center; min-width: 58px; padding: 4px 10px; background: #fffffff2; border-radius: 9px; box-shadow: 0 2px 8px #6c63ad1a; white-space: nowrap; }
+.nodeLabel strong { font-size: 12px; color: #474d6a; line-height: 1.5; }
+.nodeLabel small { font-size: 10px; color: #8b8fa6; }
+.person { background: linear-gradient(140deg, #f7d9e7, #e6d9fb); color: #9a6f9c; }
+.place { background: linear-gradient(140deg, #d6e7fb, #dcf2ee); color: #5f86a3; }
+.initial { font-size: 22px; font-weight: 700; }
+.mapEmpty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: #9a93c0; font-size: 12px; }
+.legend { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 12px; padding: 7px 12px; background: #ffffffe6; border-radius: 9px; font-size: 10px; color: #6f7590; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; }
+.dotPerson, .dotPlace { width: 8px; height: 8px; border-radius: 50%; }
+.dotPerson { background: #e49cc2; }
+.dotPlace { background: #82a8de; }
+.dotLine { width: 16px; height: 2px; background: #a99de8; border-radius: 2px; }
+.zoomControls { position: absolute; right: 12px; bottom: 12px; display: grid; gap: 6px; }
+.zoomControls button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #ecebf5; background: #fffffff2; color: #6f6a9a; border-radius: 9px; }
+.mapNote { position: absolute; right: 12px; top: 12px; font-size: 10px; color: #6f7590; background: #ffffffe6; padding: 5px 9px; border-radius: 8px; }
+
+/* 꿈 경로 */
+.routeLayer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: 4; pointer-events: none; }
+.nodeDim .nodeImage { opacity: .35; filter: grayscale(.4); }
+.nodeDim .nodeLabel { opacity: .55; }
+.routeLine { fill: none; stroke: #7c6ee0; stroke-width: 2.6; stroke-dasharray: 7 6; stroke-linecap: round; animation: routeFlow 1.2s linear infinite; }
+.routeHead { fill: #7c6ee0; }
+@keyframes routeFlow { to { stroke-dashoffset: -13; } }
+.stepBadge { position: absolute; top: -4px; left: -4px; min-width: 24px; height: 24px; padding: 0 6px; display: grid; place-items: center; border-radius: 12px; background: #7c6ee0; color: #fff; font-size: 11px; font-weight: 700; border: 2px solid #fff; box-shadow: 0 2px 6px #5d50c04d; }
+.routeBanner { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 13px; background: #fffffff2; border-radius: 10px; box-shadow: 0 2px 10px #6c63ad1f; font-size: 11px; color: #6f7590; }
+.routeBanner > span { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.routeBanner strong { color: #5a4fbf; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routeBanner button { margin-left: auto; flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: #f3f1fb; color: #7a74a0; border-radius: 7px; }
+.dotRoute { width: 16px; height: 0; border-top: 2px dashed #7c6ee0; }
+.dreamList li { display: grid; gap: 5px; }
+.dreamOn .dreamItem { border-color: #a99de8; background: #f8f6ff; }
+.routeButton { justify-self: start; display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: #7c74b4; font-size: 10px; padding: 2px 4px; border-radius: 6px; }
+.routeButton:hover, .routeButton[aria-pressed="true"] { color: #5a4fbf; background: #f1eefc; }
+
+/* 기간 */
+.periodPicker { display: inline-flex; align-items: center; gap: 6px; background: #ffffffcf; padding: 0 10px; border: 1px solid #eeedf6; border-radius: 9px; color: #7f78b8; }
+.periodPicker select { border: 0; background: transparent; color: #5f6680; font-size: 11px; padding: 9px 2px; font-family: inherit; cursor: pointer; }
+.periodPicker:focus-within { outline: 3px solid #aaa0eb; outline-offset: 2px; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fieldWarn { font-size: 10px; font-weight: 400; color: #a0742c; background: #fdf6e8; padding: 6px 9px; border-radius: 7px; line-height: 1.7; }
+
+/* 자주 나온 항목, 추가할 수 있는 이름 */
+.frequent { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.frequent button { width: 100%; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 2px; border-radius: 10px; }
+.frequent button:hover { background: #f6f5fd; }
+.frequentImage { width: 62px; height: 62px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 3px 10px #6c63ad1f; }
+.frequent strong { font-size: 12px; color: #4f5672; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frequent small { font-size: 10px; color: #8b8fa6; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip, .candidate { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e6e3f5; background: #fbfaff; color: #5f5a8c; border-radius: 20px; padding: 6px 11px; font-size: 11px; }
+.chip:hover, .candidate:hover { background: #f0edfc; border-color: #cfc7f3; }
+.chip small, .candidate small { color: #9792b3; font-size: 10px; }
+.candidate { border-style: dashed; }
+
+/* 오른쪽 상세 */
+.detailPanel { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow: auto; }
+.entityHead { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding-bottom: 18px; border-bottom: 1px solid #eeeef5; }
+.entityImage { width: 76px; height: 76px; border-radius: 16px; overflow: hidden; display: grid; place-items: center; }
+.entityHead h2 { font-size: 18px; font-weight: 700; color: #3f4563; display: flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }
+.entityHead p { font-size: 11px; color: #7f86a0; margin-top: 4px; }
+.kindBadge { font-size: 10px; font-weight: 400; color: #7f74c4; background: #f1eefb; padding: 2px 7px; border-radius: 6px; flex: 0 0 auto; }
+.iconButton { display: grid; place-items: center; width: 30px; height: 30px; border: 0; background: #f6f5fc; color: #8a83a2; border-radius: 8px; align-self: start; }
+.iconButton:hover { background: #ece9fa; color: #655bc0; }
+.panelBox { margin-top: 18px; padding: 14px 15px; background: #f8f7fd; border-radius: 11px; }
+.panelBox h3, .panelSection h3 { font-size: 12px; font-weight: 700; color: #5c627d; display: flex; align-items: center; gap: 6px; }
+.appearance { display: grid; gap: 8px; margin: 11px 0 0; }
+.appearance div { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 8px; font-size: 11px; line-height: 1.7; }
+.appearance dt { color: #8b90a6; }
+.appearance dd { color: #535b76; overflow-wrap: anywhere; }
+.muted { color: #b0b2c3; }
+.panelNote { font-size: 10px; color: #8a8ea3; line-height: 1.8; margin-top: 10px; }
+.panelSection { margin-top: 20px; }
+.panelSection h3 { margin-bottom: 11px; }
+.dreamList { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
+.dreamItem { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 8px; border: 1px solid #eceaf5; border-radius: 11px; background: #fff; color: inherit; text-decoration: none; }
+.dreamItem:hover { background: #fbfaff; border-color: #d9d3f4; }
+.dreamItem > svg { color: #aba5c0; }
+.dreamThumb { width: 58px; height: 58px; border-radius: 9px; overflow: hidden; display: grid; place-items: center; background: linear-gradient(140deg, #e5e3fa, #f0e9f8); color: #8c84c4; }
+.dreamThumb .initial { font-size: 16px; }
+.dreamText { display: grid; gap: 2px; min-width: 0; }
+.dreamText time { font-size: 10px; color: #8b8fa6; }
+.dreamText strong { font-size: 11px; color: #4f5672; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dreamText span { font-size: 10px; color: #7f859b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panelEmptyText { font-size: 11px; color: #8c8fa4; line-height: 1.8; }
+.notice { color: #3d8071; background: #eef8f4; border-radius: 9px; padding: 9px 12px; font-size: 11px; margin-bottom: 14px; }
+
+/* 등록과 수정 */
+.form { display: grid; gap: 15px; }
+.formHead { display: flex; align-items: center; justify-content: space-between; }
+.formHead h2 { font-size: 15px; font-weight: 700; color: #444b69; }
+.helper { font-size: 11px; color: #747c93; line-height: 1.8; margin-top: -6px; }
+.kindPicker { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kindPicker legend { font-size: 11px; font-weight: 600; color: #646c86; margin-bottom: 8px; }
+.kindPicker label { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 1px solid #e2dfef; border-radius: 9px; font-size: 12px; color: #747a93; cursor: pointer; background: #fcfcff; }
+.kindPicker label.kindOn { border-color: #a297ee; background: #f3f0fd; color: #5f55b8; font-weight: 700; }
+.kindPicker input { position: absolute; opacity: 0; pointer-events: none; }
+.kindPicker label:focus-within { outline: 3px solid #aaa0eb; outline-offset: 2px; }
+.field { display: grid; gap: 7px; font-size: 11px; font-weight: 600; color: #646c86; }
+.field input, .field textarea { border: 1px solid #e2dfef; background: #fcfcff; border-radius: 8px; padding: 10px 11px; color: #535c74; font-size: 12px; font-weight: 400; width: 100%; min-width: 0; font-family: inherit; }
+.field textarea { resize: vertical; line-height: 1.7; }
+.field input[aria-invalid="true"] { border-color: #e2a7ae; }
+.fieldHint { font-size: 10px; font-weight: 400; color: #959aae; line-height: 1.7; }
+.fieldError, .formError { font-size: 11px; font-weight: 400; color: #ab555f; line-height: 1.7; }
+.formActions { display: grid; grid-template-columns: 1fr 1.6fr; gap: 9px; }
+.primaryButton, .secondaryButton { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 9px; font-size: 11px; padding: 9px 15px; line-height: 1.6; white-space: nowrap; }
+.primaryButton { border: 1px solid #8c7ed2; background: #9283dc; color: #fff; font-weight: 600; }
+.primaryButton:hover:not(:disabled) { background: #8171ca; }
+.secondaryButton { background: #fbfaff; border: 1px solid #e2def4; color: #7b70b0; }
+.secondaryButton:hover { background: #f1eefa; }
+.stateBox { display: grid; justify-items: center; align-content: center; gap: 12px; text-align: center; padding: 48px 20px; color: #9991b8; }
+.stateBox h2 { font-size: 15px; font-weight: 600; color: #6f708c; }
+.stateBox p { font-size: 12px; line-height: 1.9; color: #8c8da2; }
+
+@media (max-width: 1150px) {
+  .app { grid-template-columns: 169px minmax(0, 1fr); }
+  .sidebar { padding-left: 10px; padding-right: 10px; }
+  .main { padding: 28px 22px; }
+  .workspace { grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; }
+  .frequent { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 930px) {
+  .workspace { grid-template-columns: 1fr; }
+  .detailPanel { position: static; max-height: none; }
+  .frequent { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+  .app { display: block; }
+  .sidebar { position: static; height: auto; padding: 17px 18px 0; border-right: 0; border-bottom: 1px solid #e7e6f2; }
+  .brand div > span { display: none; }
+  .navigation { display: flex; gap: 2px; margin-top: 18px; padding-bottom: 13px; overflow-x: auto; }
+  .navItem { flex: 0 0 auto; width: auto; padding: 10px 7px; gap: 6px; font-size: 11px; white-space: nowrap; }
+  .sidebarDecoration, .demoInfo p { display: none; }
+  .demoInfo { position: absolute; top: 19px; right: 20px; padding: 0; border: 0; }
+  .main { padding: 24px 15px; }
+  .pageHeader { flex-direction: column; gap: 14px; }
+  .headingGroup h1 { font-size: 22px; }
+  .cardRow { grid-template-columns: 1fr; }
+  .cardHead { flex-direction: column; }
+  .mapCanvas { min-width: 620px; min-height: 500px; }
+  .card { padding: 18px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .nodeImage, .mapLines path { transition: none; } .routeLine { animation: none; } }
