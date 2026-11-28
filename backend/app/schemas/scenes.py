@@ -29,6 +29,7 @@ class SceneItem(BaseModel):
     status: JobStatus
     confidence_level: Confidence | None = None
     active_job: JobSummary | None = None
+    current_version_id: int
 
 
 class SceneListResponse(BaseModel):

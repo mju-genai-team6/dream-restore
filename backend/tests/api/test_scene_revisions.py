@@ -146,6 +146,35 @@ def test_version_conflict_and_not_a_revision(monkeypatch, session_factory, read_
     assert _version_count(read_db, scene.id) == before
 
 
+def test_scene_list_exposes_current_version_id_for_revision(monkeypatch, session_factory, read_db):
+    dream_id = _dream(session_factory, DreamStatus.IMAGES_READY)
+    _enable(monkeypatch)
+    read_db.expire_all()
+    stored = {
+        scene.id: scene.current_version_id
+        for scene in read_db.scalars(select(Scene).where(Scene.dream_id == dream_id))
+    }
+
+    listed = client.get(f"/dreams/{dream_id}/scenes")
+
+    assert listed.status_code == 200
+    scenes = listed.json()["scenes"]
+    assert {row["scene_id"]: row["current_version_id"] for row in scenes} == stored
+    scene = _scene(read_db, dream_id)
+    res = client.post(
+        f"/scenes/{scene.id}/revisions",
+        json={"instruction": "바다가 아니라 호수였어", "base_version_id": stored[scene.id]},
+    )
+    assert res.status_code == 202
+    assert res.json()["scene_version_id"] != stored[scene.id]
+
+    again = client.get(f"/dreams/{dream_id}/scenes").json()["scenes"]
+    updated = next(row for row in again if row["scene_id"] == scene.id)
+    assert updated["current_version_id"] == res.json()["scene_version_id"]
+    unchanged = {row["scene_id"]: row["current_version_id"] for row in again if row["scene_id"] != scene.id}
+    assert unchanged == {scene_id: version_id for scene_id, version_id in stored.items() if scene_id != scene.id}
+
+
 def test_success_switches_current_version_and_keeps_dream_status(monkeypatch, session_factory, read_db):
     dream_id = _dream(session_factory, DreamStatus.IMAGES_READY)
     scene = _scene(read_db, dream_id)

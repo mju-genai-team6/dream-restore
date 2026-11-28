@@ -73,6 +73,7 @@ def list_scenes(db: Session, dream_id: int) -> SceneListResponse:
                 status=JobStatus(version.status),
                 confidence_level=Confidence(version.confidence_level) if version.confidence_level else None,
                 active_job=job_summary(active) if active is not None else None,
+                current_version_id=version.id,
             )
         )
     return SceneListResponse(scenes=items)
