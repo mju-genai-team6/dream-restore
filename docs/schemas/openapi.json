@@ -1249,6 +1249,149 @@
         }
       }
     },
+    "/scenes/{scene_id}/revisions": {
+      "post": {
+        "tags": [
+          "scenes"
+        ],
+        "summary": "자연어로 장면 하나 수정 (설정으로 켜고, D의 revise_scene이 있을 때만)",
+        "operationId": "create_revision_scenes__scene_id__revisions_post",
+        "parameters": [
+          {
+            "name": "scene_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scene Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneRevisionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneRevisionAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 값 형식 오류",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "요청 값을 확인해 주세요.",
+                    "detail": {
+                      "errors": []
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "꿈 기록을 찾을 수 없습니다.",
+                    "detail": {
+                      "dream_id": 999
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "현재 상태에서 허용되지 않은 요청",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "INVALID_STATE",
+                    "message": "현재 단계에서는 할 수 없는 요청입니다.",
+                    "detail": {
+                      "status": "interviewing"
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "외부 AI 호출 실패",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "LLM_FAILED",
+                    "message": "질문을 만들지 못했습니다. 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "외부 AI 응답 시간 초과",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_TIMEOUT",
+                    "message": "AI 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.",
+                    "detail": {}
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/dreams/{dream_id}/renders": {
       "post": {
         "tags": [
@@ -3110,6 +3253,45 @@
             ]
           }
         ]
+      },
+      "SceneRevisionAccepted": {
+        "properties": {
+          "scene_version_id": {
+            "type": "integer",
+            "title": "Scene Version Id"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scene_version_id",
+          "job"
+        ],
+        "title": "SceneRevisionAccepted",
+        "description": "새 장면 버전과 그 버전의 이미지 작업. 나레이션 작업은 응답에 넣지 않는다."
+      },
+      "SceneRevisionCreate": {
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Instruction"
+          },
+          "base_version_id": {
+            "type": "integer",
+            "title": "Base Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruction",
+          "base_version_id"
+        ],
+        "title": "SceneRevisionCreate",
+        "description": "자연어 수정 요청. instruction은 앞뒤 공백을 뺀 뒤 1~200자여야 한다."
       },
       "SceneVersionRef": {
         "properties": {

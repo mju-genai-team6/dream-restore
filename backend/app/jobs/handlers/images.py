@@ -88,6 +88,7 @@ def save_image(db: Session, job: Job, result: dict) -> None:
 
     꿈 행을 먼저 잠근다. 마지막 두 장면이 동시에 끝나도 뒤 작업은 앞 작업의 commit을 본 뒤
     all_images_done을 읽으므로, 둘 다 False로 보고 전이를 놓치는 일이 없다.
+    저장한 버전이 현재 버전이 아니면 그 버전으로 바꾼다. 꿈 상태는 바꾸지 않는다.
     """
     dream_repo.lock_dream(db, job.dream_id)
     version = scene_repo.get_scene_version(db, job.target_id) if job.target_id else None
@@ -106,6 +107,11 @@ def save_image(db: Session, job: Job, result: dict) -> None:
     )
     if not saved:
         raise JobError(FailureCode.INVALID_INPUT, ALREADY_SAVED_MESSAGE)
+
+    # 수정으로 만든 버전은 아직 현재 버전이 아니다. 이미지가 성공하면 그때 교체한다. 꿈 상태는 바꾸지 않는다.
+    scene = db.get(Scene, version.scene_id)
+    if scene is not None and scene.current_version_id != version.id:
+        scene_repo.set_current_version(db, scene.id, version.id)
 
     maybe_mark_images_ready(db, job.dream_id, ignore_job_id=job.id)
 
