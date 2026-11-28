@@ -247,6 +247,7 @@ SCENES = {
             "status": "succeeded",
             "confidence_level": "high",
             "active_job": None,
+            "current_version_id": 1,
         },
         {
             "scene_id": 2,
@@ -263,6 +264,7 @@ SCENES = {
             "status": "succeeded",
             "confidence_level": "high",
             "active_job": None,
+            "current_version_id": 2,
         },
         {
             "scene_id": 3,
@@ -290,6 +292,7 @@ SCENES = {
                 "started_at": UPDATED_AT,
                 "finished_at": None,
             },
+            "current_version_id": 3,
         },
     ]
 }

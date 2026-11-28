@@ -3123,6 +3123,10 @@
                 "type": "null"
               }
             ]
+          },
+          "current_version_id": {
+            "type": "integer",
+            "title": "Current Version Id"
           }
         },
         "type": "object",
@@ -3132,7 +3136,8 @@
           "summary_ko",
           "version_no",
           "elements",
-          "status"
+          "status",
+          "current_version_id"
         ],
         "title": "SceneItem"
       },
@@ -3156,6 +3161,7 @@
             "scenes": [
               {
                 "confidence_level": "high",
+                "current_version_id": 1,
                 "elements": [
                   {
                     "confidence": "high",
@@ -3179,6 +3185,7 @@
               },
               {
                 "confidence_level": "high",
+                "current_version_id": 2,
                 "elements": [
                   {
                     "confidence": "high",
@@ -3224,6 +3231,7 @@
                   "target_id": 3,
                   "type": "generate_image"
                 },
+                "current_version_id": 3,
                 "elements": [
                   {
                     "confidence": "low",
