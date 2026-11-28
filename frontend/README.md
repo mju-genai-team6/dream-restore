@@ -19,6 +19,7 @@ npm.cmd run dev
 - 스토리보드: 장면 선택, 내용과 확신도 수정, 이전 버전 조회
 - 꿈 보관함: 제목 검색, 기록 상세, 스토리보드 재열람
 - 영상 결과: 영상 미완료 안내와 결과 URL 기반 재생 화면
+- 꿈 세계관 (`/world`): 인물과 장소 지도, 함께 나온 항목 연결, 세계관 항목 등록과 외형 수정
 
 기본 실행은 가상의 꿈을 사용하는 예시 모드입니다. 장면 수정본은 현재 브라우저에 저장됩니다.
 
@@ -47,7 +48,7 @@ npm run dev                # Windows PowerShell에서 막히면 npm.cmd run dev
 - 백엔드의 `IMAGE_GENERATION_MODE=fake`는 외부 이미지 API를 사용하지 않는 시험용 이미지입니다. 실제 이미지 생성은 팀의 리허설·시연 계획에 맞춰 진행합니다. 이미지 모드와 별개로 음성 인식·인터뷰·장면 분할의 실제 LLM 호출은 비용이 들 수 있습니다.
 - 환경 변수를 지정하지 않으면 기존 예시 모드입니다. B1의 예시 기록과 B2의 예시 보관함 데이터는 별개이므로 전체 연결은 서버 조회 모드에서 확인합니다.
 
-기록 화면 안내는 [기록 흐름 README](features/dream-record/README.md), 결과 화면 안내는 [결과·보관 README](features/dream-results/README.md)를 참고하세요. API 공통 규칙은 ../docs/rules/ 에 있습니다.
+기록 화면 안내는 [기록 흐름 README](features/dream-record/README.md), 결과 화면 안내는 [결과·보관 README](features/dream-results/README.md), 세계관 화면 안내는 [세계관 README](features/dream-world/README.md)를 참고하세요. API 공통 규칙은 ../docs/rules/ 에 있습니다.
 
 ## 확인 명령
 

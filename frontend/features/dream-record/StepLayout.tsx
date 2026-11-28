@@ -53,6 +53,9 @@ export default function StepLayout({ step, title, description, children }: Props
           <Link href="/" className={styles.navItem}>
             <Icon name="archive" size={21} />결과와 보관
           </Link>
+          <Link href="/world" className={styles.navItem}>
+            <Icon name="globe" size={21} />꿈 세계관
+          </Link>
         </nav>
         <div className={styles.sidebarDecoration} aria-hidden="true">
           <span>✧</span>

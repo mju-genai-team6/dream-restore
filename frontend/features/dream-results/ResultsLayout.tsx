@@ -32,6 +32,7 @@ export default function ResultsLayout({ view, onNavigate, dream, fromApi = false
       <nav className={styles.navigation} aria-label="결과 및 보관 메뉴">
         <Link href="/record" className={styles.navItem}><Icon name="mic" size={21} />꿈 기록하기</Link>
         {availableViews.map((item) => <button type="button" key={item.id} className={`${styles.navItem} ${view === item.id ? styles.activeNav : ""}`} aria-current={view === item.id ? "page" : undefined} onClick={() => onNavigate(item.id)}><Icon name={item.icon} size={21} />{item.title}</button>)}
+        <Link href="/world" className={styles.navItem}><Icon name="globe" size={21} />꿈 세계관</Link>
       </nav>
       <div className={styles.sidebarDecoration} aria-hidden="true"><span>✧</span><Icon name="moon" size={62} /><span>✦</span></div>
       <div className={styles.demoInfo}>
